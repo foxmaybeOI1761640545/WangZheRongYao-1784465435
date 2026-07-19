@@ -3,5 +3,5 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/codexTest-202606221153/',
+  base: '/WangZheRongYao-1784465435/',
 })
