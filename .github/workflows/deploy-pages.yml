@@ -3,7 +3,7 @@ name: Build and Deploy GitHub Pages
 on:
   push:
     branches:
-      - codex/2026-06-26/06-51-53-utc
+      - main
   workflow_dispatch:
 
 permissions:
