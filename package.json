@@ -1,12 +1,13 @@
 {
-  "name": "codextest-202606221153",
+  "name": "vue-vite-pages-project-template",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "check": "npm run build"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "latest",
