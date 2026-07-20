@@ -13,6 +13,8 @@ const emit = defineEmits([
   'add-group',
   'add-server',
   'open-settings',
+  'delete-group',
+  'delete-server',
 ])
 
 const childGroups = computed(() => props.group.children.filter((item) => item.type === 'group'))
@@ -48,7 +50,7 @@ function skinCount(value) {
     </nav>
 
     <header class="view-header">
-      <div>
+      <div class="view-summary">
         <p class="eyebrow">Account groups</p>
         <h2>{{ group.name }}</h2>
         <p class="view-description">
@@ -89,23 +91,32 @@ function skinCount(value) {
       </div>
 
       <div class="group-list">
-        <button
-          v-for="item in childGroups"
-          :key="item.id"
-          class="group-card"
-          type="button"
-          @click="emit('navigate-group', item.id)"
-        >
-          <span class="group-card-icon">▦</span>
-          <span class="group-card-copy">
-            <strong>{{ item.name }}</strong>
-            <small>
-              {{ item.children.filter((child) => child.type === 'group').length }} 个分组 ·
-              {{ item.children.filter((child) => child.type === 'server').length }} 个区服
-            </small>
-          </span>
-          <span class="group-card-arrow">›</span>
-        </button>
+        <div v-for="item in childGroups" :key="item.id" class="group-card-shell">
+          <button
+            class="group-card"
+            type="button"
+            @click="emit('navigate-group', item.id)"
+          >
+            <span class="group-card-icon">▦</span>
+            <span class="group-card-copy">
+              <strong>{{ item.name }}</strong>
+              <small>
+                {{ item.children.filter((child) => child.type === 'group').length }} 个分组 ·
+                {{ item.children.filter((child) => child.type === 'server').length }} 个区服
+              </small>
+            </span>
+            <span class="group-card-arrow">›</span>
+          </button>
+          <button
+            class="card-delete group-card-delete"
+            type="button"
+            :aria-label="`删除分组 ${item.name}`"
+            :title="`删除分组 ${item.name}`"
+            @click="emit('delete-group', item.id)"
+          >
+            删
+          </button>
+        </div>
       </div>
     </section>
 
@@ -119,38 +130,47 @@ function skinCount(value) {
       </div>
 
       <div class="server-grid">
-        <button
-          v-for="server in servers"
-          :key="server.id"
-          class="server-card"
-          type="button"
-          @click="emit('navigate-server', server.id)"
-        >
-          <span class="server-card-topline">
-            <strong>{{ server.serverName }}</strong>
-            <span class="server-arrow">›</span>
-          </span>
+        <div v-for="server in servers" :key="server.id" class="server-card-shell">
+          <button
+            class="server-card"
+            type="button"
+            @click="emit('navigate-server', server.id)"
+          >
+            <span class="server-card-topline">
+              <strong>{{ server.serverName }}</strong>
+              <span class="server-arrow">›</span>
+            </span>
 
-          <span class="tag-row">
-            <span class="tag">{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
-            <span class="tag accent">{{ optionLabel(PLATFORM_OPTIONS, server.platform) }}</span>
-            <span class="tag crop">{{ server.cropType }} 小时作物</span>
-          </span>
+            <span class="tag-row">
+              <span class="tag">{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
+              <span class="tag accent">{{ optionLabel(PLATFORM_OPTIONS, server.platform) }}</span>
+              <span class="tag crop">{{ server.cropType }} 小时作物</span>
+            </span>
 
-          <span class="server-card-id">
-            {{ server.accountId || '未填写账号 ID' }}
-          </span>
+            <span class="server-card-id">
+              {{ server.accountId || '未填写账号 ID' }}
+            </span>
 
-          <span class="metric-row">
-            <span><small>账号</small><b>Lv.{{ server.accountLevel }}</b></span>
-            <span><small>战令</small><b>Lv.{{ server.battlePassLevel }}</b></span>
-            <span><small>农场</small><b>Lv.{{ server.farmLevel }}</b></span>
-          </span>
+            <span class="metric-row">
+              <span><small>账号</small><b>Lv.{{ server.accountLevel }}</b></span>
+              <span><small>战令</small><b>Lv.{{ server.battlePassLevel }}</b></span>
+              <span><small>农场</small><b>Lv.{{ server.farmLevel }}</b></span>
+            </span>
 
-          <span class="skin-summary">
-            史诗级以上皮肤：{{ skinCount(server.epicSkins) ? `${skinCount(server.epicSkins)} 款` : '未记录' }}
-          </span>
-        </button>
+            <span class="skin-summary">
+              史诗级以上皮肤：{{ skinCount(server.epicSkins) ? `${skinCount(server.epicSkins)} 款` : '未记录' }}
+            </span>
+          </button>
+          <button
+            class="card-delete server-card-delete"
+            type="button"
+            :aria-label="`删除区服账号 ${server.serverName}`"
+            :title="`删除区服账号 ${server.serverName}`"
+            @click="emit('delete-server', server.id)"
+          >
+            删
+          </button>
+        </div>
       </div>
     </section>
   </section>
