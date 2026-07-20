@@ -1,0 +1,231 @@
+.server-list-grid {
+  gap: 9px;
+}
+
+.compact-server-shell {
+  min-width: 0;
+}
+
+.compact-server-card {
+  min-height: 108px !important;
+  padding: 13px 44px 11px 14px !important;
+  border: 1px solid rgba(104, 153, 205, 0.48) !important;
+  border-radius: 12px !important;
+  color: #eef6ff !important;
+  background:
+    linear-gradient(90deg, rgba(42, 80, 120, 0.98), rgba(48, 88, 132, 0.94)) !important;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.06),
+    0 7px 18px rgba(25, 51, 82, 0.14) !important;
+}
+
+.compact-server-card:hover {
+  border-color: rgba(122, 184, 242, 0.8) !important;
+  background:
+    linear-gradient(90deg, rgba(48, 91, 137, 1), rgba(55, 101, 151, 0.98)) !important;
+}
+
+.compact-server-title {
+  display: grid;
+  grid-template-columns: 10px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.server-status-diamond {
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(255, 168, 168, 0.86);
+  background: #f33f47;
+  box-shadow: 0 0 8px rgba(255, 51, 68, 0.75);
+  transform: rotate(45deg);
+}
+
+.compact-server-title strong {
+  overflow: hidden;
+  color: #f6fbff;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-account-id {
+  overflow: hidden;
+  color: rgba(226, 240, 255, 0.82);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-server-title .server-arrow {
+  color: rgba(229, 241, 255, 0.72);
+  font-size: 20px;
+}
+
+.compact-server-meta,
+.compact-server-extra {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding-left: 17px;
+}
+
+.compact-server-meta {
+  margin-top: 8px;
+  color: rgba(211, 228, 248, 0.84);
+  font-size: 11px;
+}
+
+.compact-server-meta span:not(:last-child)::after {
+  margin-left: 8px;
+  color: rgba(183, 207, 234, 0.42);
+  content: "·";
+}
+
+.compact-rank-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 4px 4px 7px 7px;
+  color: #d8ffe3;
+  background: linear-gradient(180deg, #137343, #0d4e30);
+  box-shadow: inset 0 0 0 1px rgba(157, 255, 196, 0.28);
+  font-family: Georgia, serif;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.compact-server-extra {
+  margin-top: 7px;
+  justify-content: space-between;
+  color: rgba(191, 216, 242, 0.67);
+  font-size: 10px;
+}
+
+.compact-server-extra span {
+  overflow: hidden;
+  max-width: 50%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-server-shell .server-card-delete {
+  top: 8px;
+  right: 8px;
+  width: 29px;
+  height: 29px;
+  border-color: rgba(255, 145, 154, 0.46);
+  color: #ffd8dc;
+  background: rgba(113, 24, 39, 0.76);
+  box-shadow: 0 4px 12px rgba(10, 25, 45, 0.24);
+}
+
+.compact-server-shell .server-card-delete:hover {
+  border-color: rgba(255, 183, 190, 0.8);
+  color: #fff;
+  background: rgba(163, 34, 51, 0.92);
+}
+
+.app-footer {
+  text-align: center;
+  font-size: 0 !important;
+  line-height: 1.5;
+}
+
+.app-footer::before {
+  display: block;
+  color: #6f7a8d;
+  content: "资料默认保存在当前浏览器中；建议定期导出 JSON 或备份到独立 GitHub 分支。";
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+@media (max-width: 760px) {
+  .server-list-grid {
+    gap: 7px;
+  }
+
+  .compact-server-card {
+    min-height: 104px !important;
+    padding: 11px 38px 10px 11px !important;
+  }
+
+  .compact-server-title {
+    grid-template-columns: 9px auto minmax(0, 1fr) auto;
+    gap: 5px;
+  }
+
+  .compact-server-title strong {
+    font-size: 12px;
+  }
+
+  .compact-account-id {
+    font-size: 10px;
+  }
+
+  .compact-server-meta,
+  .compact-server-extra {
+    gap: 3px 5px;
+    padding-left: 14px;
+  }
+
+  .compact-server-meta {
+    margin-top: 7px;
+    font-size: 9px;
+  }
+
+  .compact-server-meta span:not(:last-child)::after {
+    margin-left: 5px;
+  }
+
+  .compact-server-extra {
+    margin-top: 6px;
+    font-size: 9px;
+  }
+
+  .compact-server-shell .server-card-delete {
+    top: 6px;
+    right: 6px;
+    width: 27px;
+    height: 27px;
+    font-size: 10px;
+  }
+
+  .app-footer::before {
+    content: "资料默认保存在当前浏览器中；\A建议定期导出 JSON 或备份到独立 GitHub 分支。";
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .compact-server-card {
+    min-height: 110px !important;
+  }
+
+  .compact-server-title {
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+  }
+
+  .compact-account-id {
+    grid-column: 2 / -1;
+    padding-right: 25px;
+  }
+
+  .compact-server-extra span:last-child {
+    display: none;
+  }
+
+  .compact-server-extra span {
+    max-width: 100%;
+  }
+
+  .app-footer::before {
+    content: "资料默认保存在当前浏览器中；\A建议定期导出 JSON\A或备份到独立 GitHub 分支。";
+  }
+}
