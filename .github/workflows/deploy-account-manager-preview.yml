@@ -1,0 +1,70 @@
+name: Deploy Account Manager Preview
+
+on:
+  push:
+    branches:
+      - 'future/1784534225/AccountManager'
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: account-manager-gh-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build feature branch and publish gh-pages
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref_name == 'future/1784534225/AccountManager' ||
+      github.head_ref == 'future/1784534225/AccountManager'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout account manager branch
+        uses: actions/checkout@v4
+        with:
+          ref: future/1784534225/AccountManager
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Validate Pages asset paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          grep -q '/WangZheRongYao-1784465435/assets/' dist/index.html
+          if grep -q '/codexTest-202606221153/' dist/index.html; then
+            echo 'Found obsolete Pages base path.' >&2
+            exit 1
+          fi
+
+      - name: Publish gh-pages with temporary PAT
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.REPAIR_PAT }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false
+          commit_message: 'Deploy Account Manager preview from ${{ github.sha }}'
