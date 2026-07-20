@@ -1,0 +1,20 @@
+# Android Studio and Gradle
+.gradle/
+.idea/
+local.properties
+build/
+**/build/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Generated Capacitor files
+app/src/main/assets/public/
+app/src/main/assets/capacitor.config.json
+app/src/main/assets/capacitor.plugins.json
+capacitor-cordova-android-plugins/
+
+# Signing material must remain outside Git
+*.jks
+*.keystore
