@@ -25,6 +25,10 @@ function optionLabel(options, value) {
   return options.find((item) => item.value === value)?.label ?? value
 }
 
+function platformPrefix(value) {
+  return value === 'wechat' ? '微信' : '手Q'
+}
+
 function skinCount(value) {
   return String(value ?? '')
     .split(/[，,\n]/)
@@ -120,7 +124,7 @@ function skinCount(value) {
       </div>
     </section>
 
-    <section v-if="servers.length" class="content-section">
+    <section v-if="servers.length" class="content-section server-section">
       <div class="section-heading">
         <div>
           <span class="section-kicker">Servers</span>
@@ -129,36 +133,31 @@ function skinCount(value) {
         <span class="count-badge">{{ servers.length }}</span>
       </div>
 
-      <div class="server-grid">
-        <div v-for="server in servers" :key="server.id" class="server-card-shell">
+      <div class="server-grid server-list-grid">
+        <div v-for="server in servers" :key="server.id" class="server-card-shell compact-server-shell">
           <button
-            class="server-card"
+            class="server-card compact-server-card"
             type="button"
             @click="emit('navigate-server', server.id)"
           >
-            <span class="server-card-topline">
-              <strong>{{ server.serverName }}</strong>
+            <span class="compact-server-title">
+              <span class="server-status-diamond" aria-hidden="true"></span>
+              <strong>{{ platformPrefix(server.platform) }}{{ server.serverName }}</strong>
+              <span class="compact-account-id">{{ server.accountId || '未填写账号 ID' }}</span>
               <span class="server-arrow">›</span>
             </span>
 
-            <span class="tag-row">
-              <span class="tag">{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
-              <span class="tag accent">{{ optionLabel(PLATFORM_OPTIONS, server.platform) }}</span>
-              <span class="tag crop">{{ server.cropType }} 小时作物</span>
+            <span class="compact-server-meta">
+              <span>Lv.{{ server.accountLevel }}</span>
+              <span class="compact-rank-mark" aria-hidden="true">Ⅲ</span>
+              <span>{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
+              <span>战令 {{ server.battlePassLevel }}</span>
+              <span>农场 {{ server.farmLevel }}</span>
             </span>
 
-            <span class="server-card-id">
-              {{ server.accountId || '未填写账号 ID' }}
-            </span>
-
-            <span class="metric-row">
-              <span><small>账号</small><b>Lv.{{ server.accountLevel }}</b></span>
-              <span><small>战令</small><b>Lv.{{ server.battlePassLevel }}</b></span>
-              <span><small>农场</small><b>Lv.{{ server.farmLevel }}</b></span>
-            </span>
-
-            <span class="skin-summary">
-              史诗级以上皮肤：{{ skinCount(server.epicSkins) ? `${skinCount(server.epicSkins)} 款` : '未记录' }}
+            <span class="compact-server-extra">
+              <span>{{ server.cropType }} 小时作物</span>
+              <span>{{ skinCount(server.epicSkins) ? `${skinCount(server.epicSkins)} 款史诗+皮肤` : '未记录皮肤' }}</span>
             </span>
           </button>
           <button
