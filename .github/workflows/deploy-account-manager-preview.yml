@@ -68,3 +68,24 @@ jobs:
           force_orphan: true
           enable_jekyll: false
           commit_message: 'Deploy Account Manager preview from ${{ github.sha }}'
+
+      - name: Set gh-pages as the GitHub Pages source
+        env:
+          GH_TOKEN: ${{ secrets.REPAIR_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            --method PUT \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/pages" \
+            --input - <<'JSON'
+          {
+            "build_type": "legacy",
+            "source": {
+              "branch": "gh-pages",
+              "path": "/"
+            }
+          }
+          JSON
