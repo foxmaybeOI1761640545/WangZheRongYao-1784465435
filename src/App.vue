@@ -110,12 +110,30 @@ function saveServer(payload) {
   if (currentServer.value) store.updateServer(currentServer.value.id, payload)
 }
 
-function deleteServer() {
-  const server = currentServer.value
-  if (!server || !window.confirm(`确定删除“${server.serverName}”及其全部资料吗？`)) return
+function deleteServerById(id) {
+  const server = store.getServer(id)
+  if (!server || !window.confirm(`确定删除“${server.serverName}”及其全部资料吗？此操作无法撤销。`)) return
   const parentId = server.parentId || 'root'
   store.deleteNode(server.id)
-  navigateGroup(parentId)
+  if (route.type === 'server' && route.id === id) navigateGroup(parentId)
+}
+
+function deleteServer() {
+  if (currentServer.value) deleteServerById(currentServer.value.id)
+}
+
+function deleteGroupById(id) {
+  const group = store.getGroup(id)
+  if (!group || group.id === 'root') return
+  const groupCount = group.children.filter((item) => item.type === 'group').length
+  const serverCount = group.children.filter((item) => item.type === 'server').length
+  const detail = groupCount || serverCount
+    ? `其中直接包含 ${groupCount} 个分组和 ${serverCount} 个区服。`
+    : '该分组当前为空。'
+  if (!window.confirm(`确定删除分组“${group.name}”及其全部下级内容吗？${detail}此操作无法撤销。`)) return
+  const parentId = group.parentId || 'root'
+  store.deleteNode(group.id)
+  if (route.type === 'group' && route.id === id) navigateGroup(parentId)
 }
 
 function saveGroupName() {
@@ -123,13 +141,10 @@ function saveGroupName() {
 }
 
 function deleteCurrentGroup() {
-  const group = currentGroup.value
-  if (group.id === 'root') return
-  if (!window.confirm(`确定删除“${group.name}”以及其中的所有子分组和区服吗？`)) return
-  const parentId = group.parentId || 'root'
-  store.deleteNode(group.id)
+  const id = currentGroup.value.id
+  if (id === 'root') return
+  deleteGroupById(id)
   showSettingsDialog.value = false
-  navigateGroup(parentId)
 }
 </script>
 
@@ -138,20 +153,20 @@ function deleteCurrentGroup() {
     <header class="app-header">
       <button class="brand" type="button" @click="navigateGroup('root')">
         <span class="brand-mark">M</span>
-        <span>
+        <span class="brand-copy">
           <strong>王者多账号管理器</strong>
           <small>本地分组 · 区服资料 · 导出备份</small>
         </span>
       </button>
 
       <div class="app-header-tools">
+        <button class="button secondary backup-launch" type="button" @click="showBackupDialog = true">
+          数据与备份
+        </button>
         <div class="global-stats">
           <span><b>{{ store.stats.value.groups }}</b><small>分组</small></span>
           <span><b>{{ store.stats.value.servers }}</b><small>区服</small></span>
         </div>
-        <button class="button secondary backup-launch" type="button" @click="showBackupDialog = true">
-          数据与备份
-        </button>
       </div>
     </header>
 
@@ -165,6 +180,8 @@ function deleteCurrentGroup() {
         @add-group="openAddGroup"
         @add-server="openAddServer"
         @open-settings="showSettingsDialog = true"
+        @delete-group="deleteGroupById"
+        @delete-server="deleteServerById"
       />
 
       <ServerDetail
@@ -287,6 +304,7 @@ function deleteCurrentGroup() {
             <span class="order-controls">
               <button class="mini-button" type="button" :disabled="!store.canMove(currentGroup.id, item.id, -1)" @click="store.moveChild(currentGroup.id, item.id, -1)">↑</button>
               <button class="mini-button" type="button" :disabled="!store.canMove(currentGroup.id, item.id, 1)" @click="store.moveChild(currentGroup.id, item.id, 1)">↓</button>
+              <button class="mini-button danger-mini" type="button" :aria-label="`删除分组 ${item.name}`" @click="deleteGroupById(item.id)">删</button>
             </span>
           </div>
         </div>
@@ -301,6 +319,7 @@ function deleteCurrentGroup() {
             <span class="order-controls">
               <button class="mini-button" type="button" :disabled="!store.canMove(currentGroup.id, item.id, -1)" @click="store.moveChild(currentGroup.id, item.id, -1)">↑</button>
               <button class="mini-button" type="button" :disabled="!store.canMove(currentGroup.id, item.id, 1)" @click="store.moveChild(currentGroup.id, item.id, 1)">↓</button>
+              <button class="mini-button danger-mini" type="button" :aria-label="`删除区服 ${item.serverName}`" @click="deleteServerById(item.id)">删</button>
             </span>
           </div>
         </div>
@@ -317,10 +336,35 @@ function deleteCurrentGroup() {
 </template>
 
 <style scoped>
-.app-header-tools { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
-.backup-launch { width: auto; min-width: 122px; white-space: nowrap; }
+.app-header-tools {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.backup-launch {
+  width: auto;
+  min-width: 122px;
+  white-space: nowrap;
+}
+
+.danger-mini {
+  color: #a62f40;
+  border-color: #efc8cf;
+  background: #fff2f4;
+}
+
 @media (max-width: 720px) {
-  .app-header-tools { width: 100%; justify-content: space-between; }
-  .backup-launch { min-width: 112px; }
+  .app-header-tools {
+    gap: 8px;
+  }
+
+  .backup-launch {
+    min-width: 108px;
+    padding-inline: 10px;
+  }
 }
 </style>
