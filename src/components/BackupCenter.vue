@@ -2,6 +2,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 const CONFIG_KEY = 'wangzhe-account-backup-config:v1'
+const PAT_STORAGE_KEY = 'wangzhe-account-backup-pat:v1'
+const PAT_REMEMBER_KEY = 'wangzhe-account-backup-remember-pat:v1'
 const DATA_STORAGE_KEY = 'wangzhe-account-manager:v1'
 const SNAPSHOT_APP = 'wangzhe-account-manager'
 const SNAPSHOT_SCHEMA_VERSION = 1
@@ -36,9 +38,9 @@ function loadConfig() {
   }
 }
 
+const rememberPat = ref(localStorage.getItem(PAT_REMEMBER_KEY) !== 'false')
 const config = reactive(loadConfig())
-const pat = ref('')
-const clearPatAfterBackup = ref(true)
+const pat = ref(rememberPat.value ? (localStorage.getItem(PAT_STORAGE_KEY) || '') : '')
 const busy = ref(false)
 const importInput = ref(null)
 const notice = reactive({ type: '', text: '', url: '' })
@@ -56,10 +58,38 @@ watch(
   { deep: true },
 )
 
+watch(
+  rememberPat,
+  (remember) => {
+    localStorage.setItem(PAT_REMEMBER_KEY, String(remember))
+    if (remember && pat.value.trim()) {
+      localStorage.setItem(PAT_STORAGE_KEY, pat.value)
+    } else if (!remember) {
+      localStorage.removeItem(PAT_STORAGE_KEY)
+    }
+  },
+  { immediate: true },
+)
+
+watch(pat, (value) => {
+  if (!rememberPat.value) return
+  if (value.trim()) localStorage.setItem(PAT_STORAGE_KEY, value)
+  else localStorage.removeItem(PAT_STORAGE_KEY)
+})
+
 const repositoryUrl = computed(() => {
   const owner = cleanText(config.owner)
   const repository = cleanText(config.repository)
-  return owner && repository ? `https://github.com/${owner}/${repository}` : ''
+  return owner && repository ? `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}` : ''
+})
+
+const backupDirectoryUrl = computed(() => {
+  const owner = cleanText(config.owner)
+  const repository = cleanText(config.repository)
+  const branch = cleanText(config.branch)
+  const rootDirectory = normaliseDirectory(config.rootDirectory)
+  if (!owner || !repository || !branch || !rootDirectory) return ''
+  return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/tree/${encodePath(branch)}/${encodePath(rootDirectory)}`
 })
 
 const backupTarget = computed(() => {
@@ -78,6 +108,12 @@ function setNotice(type, text, url = '') {
 function resetDefaults() {
   Object.assign(config, DEFAULT_CONFIG)
   resetNotice()
+}
+
+function clearSavedPat() {
+  localStorage.removeItem(PAT_STORAGE_KEY)
+  pat.value = ''
+  setNotice('success', '已清除当前浏览器中保存的 PAT。')
 }
 
 function normaliseDirectory(value) {
@@ -252,9 +288,10 @@ async function backupToGitHub() {
       throw new Error(`GitHub 备份失败（HTTP ${response.status}）${detail}`)
     }
 
-    const url = payload.content?.html_url || `${repositoryUrl.value}/blob/${encodeURIComponent(target.branch)}/${filePath}`
+    const fallbackUrl = `${repositoryUrl.value}/blob/${encodePath(target.branch)}/${encodePath(filePath)}`
+    const url = payload.content?.html_url || fallbackUrl
     setNotice('success', `备份成功：${filePath}`, url)
-    if (clearPatAfterBackup.value) pat.value = ''
+    if (!rememberPat.value) pat.value = ''
   } catch (error) {
     setNotice('error', error.message || 'GitHub 备份失败。')
   } finally {
@@ -294,7 +331,7 @@ async function backupToGitHub() {
 
       <section class="backup-section github-section">
         <div class="backup-section-heading split">
-          <div><h3>备份到 GitHub</h3><p>除 PAT 外的配置会保存在当前浏览器中，并已填入默认备份仓库。</p></div>
+          <div><h3>备份到 GitHub</h3><p>仓库配置和 PAT 都可以保存在当前浏览器，便于下次直接备份。</p></div>
           <button class="text-button" type="button" @click="resetDefaults">恢复默认配置</button>
         </div>
 
@@ -304,23 +341,28 @@ async function backupToGitHub() {
           <label class="field full"><span>分支名</span><input v-model.trim="config.branch" spellcheck="false" /></label>
           <label class="field full"><span>根目录</span><input v-model.trim="config.rootDirectory" spellcheck="false" /></label>
           <label class="field full">
-            <span>Personal Access Token（仅本次弹窗内存）</span>
+            <span>Personal Access Token</span>
             <input v-model="pat" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_..." />
           </label>
         </div>
 
         <div class="target-preview">
           <span>目标</span><strong>{{ backupTarget }}</strong>
-          <a v-if="repositoryUrl" :href="repositoryUrl" target="_blank" rel="noreferrer">打开仓库</a>
+          <a v-if="backupDirectoryUrl" :href="backupDirectoryUrl" target="_blank" rel="noreferrer">打开备份目录</a>
         </div>
 
         <label class="checkbox-row">
-          <input v-model="clearPatAfterBackup" type="checkbox" />
-          <span>备份成功后立即清空页面中的 PAT</span>
+          <input v-model="rememberPat" type="checkbox" />
+          <span>在当前浏览器保存 PAT，下次无需重新输入</span>
         </label>
 
+        <div class="pat-controls">
+          <span>{{ rememberPat ? 'PAT 将保存在此站点的 localStorage 中。' : 'PAT 仅保留到关闭弹窗或备份成功。' }}</span>
+          <button class="text-button" type="button" @click="clearSavedPat">清除已保存 PAT</button>
+        </div>
+
         <div class="security-note">
-          PAT 不会写入 localStorage、导出文件、备份 JSON 或仓库配置。建议使用只允许该仓库 Contents 读写的细粒度令牌。
+          保存 PAT 会提高便利性，但 localStorage 不加密，同源页面脚本可以读取。请仅在个人可信设备使用，并采用只允许该仓库 Contents 读写、设置过期时间的细粒度令牌。PAT 仍不会进入导出 JSON、账号备份文件或提交信息。
         </div>
 
         <div class="backup-action-row end">
@@ -368,6 +410,7 @@ async function backupToGitHub() {
 .target-preview a, .backup-notice a { color: #275da5; font-weight: 700; }
 .checkbox-row { display: flex; align-items: center; gap: 10px; margin-top: 15px; color: #46536a; }
 .checkbox-row input { width: auto; accent-color: #31588f; }
+.pat-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: #657187; font-size: 13px; }
 .security-note { margin-top: 14px; padding: 13px 15px; border-left: 4px solid #d29c33; border-radius: 10px; color: #66511f; background: #fff8e7; line-height: 1.6; }
 .backup-notice { display: flex; justify-content: space-between; gap: 12px; margin: 20px 30px 0; padding: 14px 16px; border-radius: 14px; line-height: 1.55; }
 .backup-notice.success { color: #17623a; background: #eaf8ef; border: 1px solid #bfe6cb; }
@@ -387,6 +430,7 @@ async function backupToGitHub() {
   .backup-config-grid .full { grid-column: auto; }
   .backup-action-row .button { width: 100%; }
   .target-preview { grid-template-columns: 1fr; }
+  .pat-controls { align-items: flex-start; flex-direction: column; }
   .backup-notice { flex-direction: column; margin: 16px 18px 0; }
   .backup-footer { padding: 18px; }
   .backup-footer .button { width: 100%; }
