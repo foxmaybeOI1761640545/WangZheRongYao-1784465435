@@ -93,27 +93,6 @@
   outline-offset: 2px;
 }
 
-.quick-edit-hint {
-  position: absolute;
-  top: 13px;
-  right: 14px;
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 3px 8px;
-  border: 1px solid #d9e2f2;
-  border-radius: 999px;
-  color: #5270aa;
-  background: rgba(244, 247, 253, 0.94);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.quick-edit-card .detail-label {
-  padding-right: 64px;
-}
-
 .quick-edit-modal {
   width: min(460px, 100%);
 }
@@ -170,16 +149,5 @@
   .detail-card {
     min-height: 112px;
     padding: 14px;
-  }
-
-  .quick-edit-hint {
-    top: 10px;
-    right: 10px;
-    min-height: 22px;
-    padding-inline: 7px;
-  }
-
-  .quick-edit-card .detail-label {
-    padding-right: 58px;
   }
 }
