@@ -1,0 +1,136 @@
+:root {
+  --app-max-width: 1180px;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+.app-shell {
+  width: min(var(--app-max-width), 100%);
+  height: 100dvh;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(79, 116, 205, 0.16), transparent 28rem),
+    linear-gradient(180deg, #f5f7fb 0%, #e9eef6 100%);
+}
+
+.app-header {
+  position: relative;
+  z-index: 10;
+  margin: 0;
+  padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 26px rgba(39, 56, 93, 0.08);
+  overscroll-behavior: none;
+}
+
+.app-header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.backup-launch {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.main-surface {
+  min-width: 0;
+  min-height: 0;
+  margin: 14px;
+  padding: 26px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-footer {
+  position: relative;
+  z-index: 10;
+  margin: 0;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(93, 112, 146, 0.16);
+  color: #6f7a8d;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -10px 26px rgba(39, 56, 93, 0.08);
+  overscroll-behavior: none;
+}
+
+.modal-backdrop {
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: 100%;
+  }
+
+  .app-header {
+    padding: calc(9px + env(safe-area-inset-top)) 10px 9px;
+  }
+
+  .app-header-tools {
+    gap: 7px;
+  }
+
+  .backup-launch {
+    min-width: 0;
+    padding: 9px 10px;
+    font-size: 11px;
+  }
+
+  .main-surface {
+    margin: 8px;
+    padding: 15px;
+    border-radius: 20px;
+  }
+
+  .app-footer {
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 460px) {
+  .app-header {
+    gap: 8px;
+  }
+
+  .app-header-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .global-stats {
+    align-self: flex-end;
+  }
+
+  .backup-launch {
+    width: 100%;
+  }
+}
