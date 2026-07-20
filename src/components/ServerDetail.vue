@@ -13,7 +13,44 @@ const props = defineProps({
 
 const emit = defineEmits(['navigate-group', 'save', 'delete'])
 
+const QUICK_FIELDS = {
+  accountId: {
+    label: '账号 ID',
+    kind: 'text',
+    placeholder: 'QQ号、微信标识或自定义账号 ID',
+    description: '只修改账号 ID，其他账号参数保持不变。',
+  },
+  accountLevel: {
+    label: '账号等级',
+    kind: 'number',
+    description: '请输入非负整数。',
+  },
+  battlePassLevel: {
+    label: '战令等级',
+    kind: 'number',
+    description: '请输入当前赛季的战令等级。',
+  },
+  farmLevel: {
+    label: '农场等级',
+    kind: 'number',
+    description: '请输入王者农场当前等级。',
+  },
+  cropType: {
+    label: '当前种植作物类型',
+    kind: 'crop',
+    description: '仅支持记录 8、16、32 小时作物。',
+  },
+  epicSkins: {
+    label: '史诗级以上皮肤',
+    kind: 'textarea',
+    placeholder: '每行填写一个，或使用逗号分隔',
+    description: '可以一次修改完整皮肤列表。',
+  },
+}
+
 const editing = ref(false)
+const quickField = ref('')
+const quickValue = ref('')
 const form = reactive({
   serverName: '',
   system: 'android',
@@ -42,6 +79,7 @@ function syncForm() {
 
 watch(() => props.server.id, () => {
   editing.value = false
+  quickField.value = ''
   syncForm()
 }, { immediate: true })
 
@@ -51,8 +89,10 @@ const skinList = computed(() => String(props.server.epicSkins ?? '')
   .split(/[，,\n]/)
   .map((item) => item.trim())
   .filter(Boolean))
+const quickMeta = computed(() => QUICK_FIELDS[quickField.value] ?? null)
 
 function startEditing() {
+  quickField.value = ''
   syncForm()
   editing.value = true
 }
@@ -70,6 +110,54 @@ function submit() {
 
 function requestDelete() {
   emit('delete')
+}
+
+function openQuickEdit(field) {
+  if (!QUICK_FIELDS[field]) return
+  quickField.value = field
+  quickValue.value = props.server[field] ?? ''
+}
+
+function closeQuickEdit() {
+  quickField.value = ''
+  quickValue.value = ''
+}
+
+function submitQuickEdit() {
+  const field = quickField.value
+  if (!QUICK_FIELDS[field]) return
+
+  const payload = {
+    serverName: props.server.serverName,
+    system: props.server.system,
+    platform: props.server.platform,
+    accountId: props.server.accountId,
+    accountLevel: props.server.accountLevel,
+    battlePassLevel: props.server.battlePassLevel,
+    farmLevel: props.server.farmLevel,
+    cropType: props.server.cropType,
+    epicSkins: props.server.epicSkins,
+  }
+
+  if (['accountLevel', 'battlePassLevel', 'farmLevel'].includes(field)) {
+    const parsed = Number.parseInt(quickValue.value, 10)
+    payload[field] = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  } else if (field === 'cropType') {
+    payload.cropType = CROP_OPTIONS.includes(String(quickValue.value))
+      ? String(quickValue.value)
+      : props.server.cropType
+  } else {
+    payload[field] = String(quickValue.value ?? '').trim()
+  }
+
+  emit('save', payload)
+  closeQuickEdit()
+}
+
+function quickCardKeydown(event, field) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  openQuickEdit(field)
 }
 </script>
 
@@ -187,37 +275,85 @@ function requestDelete() {
 
     <template v-else>
       <section class="detail-grid">
-        <article class="detail-card identity-card">
+        <article
+          class="detail-card identity-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改账号 ID"
+          @click="openQuickEdit('accountId')"
+          @keydown="quickCardKeydown($event, 'accountId')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">账号 ID</span>
           <strong>{{ server.accountId || '未填写' }}</strong>
           <p>{{ systemLabel }} · {{ platformLabel }} · {{ server.serverName }}</p>
         </article>
 
-        <article class="detail-card level-card">
+        <article
+          class="detail-card level-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改账号等级"
+          @click="openQuickEdit('accountLevel')"
+          @keydown="quickCardKeydown($event, 'accountLevel')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">账号等级</span>
           <strong>{{ server.accountLevel }}</strong>
           <p>当前游戏账号等级</p>
         </article>
 
-        <article class="detail-card level-card">
+        <article
+          class="detail-card level-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改战令等级"
+          @click="openQuickEdit('battlePassLevel')"
+          @keydown="quickCardKeydown($event, 'battlePassLevel')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">战令等级</span>
           <strong>{{ server.battlePassLevel }}</strong>
           <p>当前赛季战令进度</p>
         </article>
 
-        <article class="detail-card level-card">
+        <article
+          class="detail-card level-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改农场等级"
+          @click="openQuickEdit('farmLevel')"
+          @keydown="quickCardKeydown($event, 'farmLevel')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">农场等级</span>
           <strong>{{ server.farmLevel }}</strong>
           <p>王者农场当前等级</p>
         </article>
 
-        <article class="detail-card crop-card">
+        <article
+          class="detail-card crop-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改当前种植作物类型"
+          @click="openQuickEdit('cropType')"
+          @keydown="quickCardKeydown($event, 'cropType')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">当前种植</span>
           <strong>{{ server.cropType }} 小时</strong>
           <p>仅记录 8 / 16 / 32 小时作物</p>
         </article>
 
-        <article class="detail-card skins-card">
+        <article
+          class="detail-card skins-card quick-edit-card"
+          role="button"
+          tabindex="0"
+          aria-label="修改史诗级以上皮肤"
+          @click="openQuickEdit('epicSkins')"
+          @keydown="quickCardKeydown($event, 'epicSkins')"
+        >
+          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">史诗级以上皮肤</span>
           <div v-if="skinList.length" class="skin-list">
             <span v-for="skin in skinList" :key="skin" class="skin-chip">{{ skin }}</span>
@@ -226,5 +362,56 @@ function requestDelete() {
         </article>
       </section>
     </template>
+
+    <Teleport to="body">
+      <div v-if="quickMeta" class="modal-backdrop" @click.self="closeQuickEdit">
+        <form class="modal quick-edit-modal" @submit.prevent="submitQuickEdit">
+          <div class="modal-heading">
+            <div>
+              <span class="section-kicker">Quick edit</span>
+              <h3>修改{{ quickMeta.label }}</h3>
+            </div>
+            <button class="icon-button" type="button" aria-label="关闭" @click="closeQuickEdit">×</button>
+          </div>
+
+          <p class="quick-edit-value-preview">{{ quickMeta.description }}</p>
+
+          <label class="field full">
+            <span>{{ quickMeta.label }}</span>
+            <input
+              v-if="quickMeta.kind === 'text'"
+              v-model="quickValue"
+              autofocus
+              :placeholder="quickMeta.placeholder"
+            />
+            <input
+              v-else-if="quickMeta.kind === 'number'"
+              v-model.number="quickValue"
+              autofocus
+              type="number"
+              min="0"
+              inputmode="numeric"
+            />
+            <select v-else-if="quickMeta.kind === 'crop'" v-model="quickValue" autofocus>
+              <option v-for="item in CROP_OPTIONS" :key="item" :value="item">
+                {{ item }} 小时作物
+              </option>
+            </select>
+            <textarea
+              v-else
+              v-model="quickValue"
+              autofocus
+              rows="6"
+              :placeholder="quickMeta.placeholder"
+            ></textarea>
+          </label>
+
+          <div class="modal-actions">
+            <button class="button secondary" type="button" @click="closeQuickEdit">取消</button>
+            <button class="button primary" type="submit">保存此参数</button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
   </section>
 </template>
