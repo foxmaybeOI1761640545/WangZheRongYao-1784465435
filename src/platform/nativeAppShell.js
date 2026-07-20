@@ -5,9 +5,7 @@ const backHandlers = []
 let nativeBackHandle = null
 let formKeyboardCleanup = null
 
-/**
- * 注册一个原生返回键处理器。优先级更高的处理器先执行；返回 true 表示已消费事件。
- */
+/** 注册原生返回键处理器；优先级更高的处理器先执行。 */
 export function registerNativeBackHandler(handler, priority = 0) {
   const entry = { handler, priority }
   backHandlers.push(entry)
@@ -29,23 +27,53 @@ async function dispatchBackHandlers() {
   return false
 }
 
+function isVisible(element) {
+  if (!(element instanceof HTMLElement)) return false
+  const style = window.getComputedStyle(element)
+  return style.display !== 'none' && style.visibility !== 'hidden' && !element.hidden
+}
+
+/** 优先关闭最上层弹窗，复用页面已有关闭按钮，避免复制组件状态。 */
+function closeVisibleOverlay() {
+  const overlays = [...document.querySelectorAll('.modal-backdrop')].filter(isVisible)
+  const overlay = overlays.at(-1)
+  if (!overlay) return false
+
+  const closeButton = overlay.querySelector(
+    '[aria-label^="关闭"], [aria-label*="关闭"], .modal-heading .icon-button, .backup-close',
+  )
+  if (closeButton instanceof HTMLElement) {
+    closeButton.click()
+    return true
+  }
+  return false
+}
+
+/** 完整编辑表单不是弹窗；返回键先触发“取消”，再允许离开详情页。 */
+function cancelVisibleEditor() {
+  const editor = document.querySelector('.editor-panel')
+  if (!isVisible(editor)) return false
+  const cancelButton = [...editor.querySelectorAll('button')]
+    .find((button) => button.textContent?.trim() === '取消')
+  if (!(cancelButton instanceof HTMLElement)) return false
+  cancelButton.click()
+  return true
+}
+
 /**
- * 启动 Capacitor 返回键桥接。弹窗和编辑态优先关闭；未消费时使用 WebView 历史返回。
+ * 启动 Capacitor 返回键桥接：弹窗 → 编辑态 → 注册处理器 → WebView 历史。
+ * 根页面没有可返回历史时不强制退出，避免误触关闭应用。
  */
 export async function installNativeBackBridge() {
   if (!Capacitor.isNativePlatform() || nativeBackHandle) return
 
   document.documentElement.classList.add('capacitor-native')
   nativeBackHandle = await CapacitorApp.addListener('backButton', async ({ canGoBack }) => {
+    if (closeVisibleOverlay()) return
+    if (cancelVisibleEditor()) return
     if (await dispatchBackHandlers()) return
     if (canGoBack) window.history.back()
   })
-}
-
-function isVisible(element) {
-  if (!(element instanceof HTMLElement)) return false
-  const style = window.getComputedStyle(element)
-  return style.display !== 'none' && style.visibility !== 'hidden' && !element.hidden
 }
 
 function isNavigationField(element) {
@@ -71,8 +99,8 @@ function applyEnterKeyHints(root = document) {
 }
 
 /**
- * 统一处理实体键盘和 Android 软键盘 Enter：聚焦并全选下一字段；最后字段提交表单。
- * 多行文本框保留正常换行行为。
+ * Android 软键盘和实体键盘 Enter：前往下一字段并全选；最后字段提交表单。
+ * 多行文本框保留换行行为。
  */
 export function installFormEnterNavigation() {
   if (formKeyboardCleanup) return formKeyboardCleanup
@@ -88,7 +116,8 @@ export function installFormEnterNavigation() {
     const currentIndex = fields.indexOf(target)
     if (currentIndex < 0) return
 
-    const next = fields.slice(currentIndex + 1).find((field) => field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)
+    const next = fields.slice(currentIndex + 1)
+      .find((field) => field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)
     event.preventDefault()
 
     if (next) {
