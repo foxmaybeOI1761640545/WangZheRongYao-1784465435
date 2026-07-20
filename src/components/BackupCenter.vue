@@ -24,9 +24,33 @@ function cleanText(value, fallback = '') {
   return String(value ?? '').trim() || fallback
 }
 
+function safeStorageGet(key, fallback = '') {
+  try {
+    return localStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Storage failure does not block current-session use.
+  }
+}
+
+function safeStorageRemove(key) {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}
+
 function loadConfig() {
   try {
-    const saved = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}')
+    const saved = JSON.parse(safeStorageGet(CONFIG_KEY, '{}'))
     return {
       owner: cleanText(saved.owner, DEFAULT_CONFIG.owner),
       repository: cleanText(saved.repository, DEFAULT_CONFIG.repository),
@@ -38,17 +62,18 @@ function loadConfig() {
   }
 }
 
-const rememberPat = ref(localStorage.getItem(PAT_REMEMBER_KEY) !== 'false')
+const rememberPat = ref(safeStorageGet(PAT_REMEMBER_KEY, 'true') !== 'false')
 const config = reactive(loadConfig())
-const pat = ref(rememberPat.value ? (localStorage.getItem(PAT_STORAGE_KEY) || '') : '')
+const pat = ref(rememberPat.value ? safeStorageGet(PAT_STORAGE_KEY) : '')
 const busy = ref(false)
+const testingPat = ref(false)
 const importInput = ref(null)
 const notice = reactive({ type: '', text: '', url: '' })
 
 watch(
   config,
   (value) => {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify({
+    safeStorageSet(CONFIG_KEY, JSON.stringify({
       owner: value.owner,
       repository: value.repository,
       branch: value.branch,
@@ -61,26 +86,36 @@ watch(
 watch(
   rememberPat,
   (remember) => {
-    localStorage.setItem(PAT_REMEMBER_KEY, String(remember))
-    if (remember && pat.value.trim()) {
-      localStorage.setItem(PAT_STORAGE_KEY, pat.value)
-    } else if (!remember) {
-      localStorage.removeItem(PAT_STORAGE_KEY)
-    }
+    safeStorageSet(PAT_REMEMBER_KEY, String(remember))
+    if (remember && pat.value.trim()) safeStorageSet(PAT_STORAGE_KEY, pat.value)
+    if (!remember) safeStorageRemove(PAT_STORAGE_KEY)
   },
   { immediate: true },
 )
 
 watch(pat, (value) => {
   if (!rememberPat.value) return
-  if (value.trim()) localStorage.setItem(PAT_STORAGE_KEY, value)
-  else localStorage.removeItem(PAT_STORAGE_KEY)
+  if (value.trim()) safeStorageSet(PAT_STORAGE_KEY, value)
+  else safeStorageRemove(PAT_STORAGE_KEY)
 })
+
+function normaliseDirectory(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\/{2,}/g, '/')
+}
+
+function encodePath(path) {
+  return String(path).split('/').map((segment) => encodeURIComponent(segment)).join('/')
+}
 
 const repositoryUrl = computed(() => {
   const owner = cleanText(config.owner)
   const repository = cleanText(config.repository)
-  return owner && repository ? `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}` : ''
+  return owner && repository
+    ? `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`
+    : ''
 })
 
 const backupDirectoryUrl = computed(() => {
@@ -111,16 +146,9 @@ function resetDefaults() {
 }
 
 function clearSavedPat() {
-  localStorage.removeItem(PAT_STORAGE_KEY)
+  safeStorageRemove(PAT_STORAGE_KEY)
   pat.value = ''
   setNotice('success', '已清除当前浏览器中保存的 PAT。')
-}
-
-function normaliseDirectory(value) {
-  return String(value ?? '')
-    .trim()
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/\/{2,}/g, '/')
 }
 
 function validateConfig() {
@@ -145,8 +173,66 @@ function validateConfig() {
   return { owner, repository, branch, rootDirectory }
 }
 
-function encodePath(path) {
-  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/')
+function githubHeaders(token, includeContentType = false) {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
+  }
+}
+
+async function readGithubJson(endpoint, token) {
+  const response = await fetch(endpoint, {
+    headers: githubHeaders(token),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = payload.message ? `：${payload.message}` : ''
+    throw new Error(`GitHub 检查失败（HTTP ${response.status}）${detail}`)
+  }
+  return payload
+}
+
+async function testPat() {
+  resetNotice()
+  testingPat.value = true
+
+  try {
+    const target = validateConfig()
+    const token = pat.value.trim()
+    const repositoryEndpoint = `https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repository)}`
+    const branchEndpoint = `${repositoryEndpoint}/branches/${encodeURIComponent(target.branch)}`
+    const directoryEndpoint = `${repositoryEndpoint}/contents/${encodePath(target.rootDirectory)}?ref=${encodeURIComponent(target.branch)}`
+
+    const [repositoryInfo, branchInfo, directoryInfo] = await Promise.all([
+      readGithubJson(repositoryEndpoint, token),
+      readGithubJson(branchEndpoint, token),
+      readGithubJson(directoryEndpoint, token),
+    ])
+
+    const permissions = repositoryInfo.permissions
+    const permissionReported = permissions && typeof permissions.push === 'boolean'
+    const canWrite = Boolean(permissions?.push || permissions?.admin)
+    if (permissionReported && !canWrite) {
+      throw new Error('PAT 已通过仓库、分支和目录读取测试，但 GitHub 报告该令牌没有仓库写入权限。请授予 Contents: Read and write。')
+    }
+
+    const itemCount = Array.isArray(directoryInfo) ? directoryInfo.length : 1
+    const writeResult = permissionReported
+      ? '仓库写入权限可用'
+      : '读取测试通过，但响应未明确返回写入权限；首次实际备份仍是最终验证'
+
+    setNotice(
+      'success',
+      `PAT 测试通过：仓库可访问；分支 ${branchInfo.name || target.branch} 存在；目录 ${target.rootDirectory} 可读取（${itemCount} 项）；${writeResult}。`,
+      backupDirectoryUrl.value,
+    )
+  } catch (error) {
+    setNotice('error', error.message || 'PAT 测试失败。')
+  } finally {
+    testingPat.value = false
+  }
 }
 
 function encodeBase64Utf8(text) {
@@ -161,7 +247,7 @@ function encodeBase64Utf8(text) {
 
 function readCurrentRoot() {
   try {
-    const raw = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || 'null')
+    const raw = JSON.parse(safeStorageGet(DATA_STORAGE_KEY, 'null'))
     if (raw?.type === 'group') return raw
   } catch {
     // Fall through to an empty root snapshot.
@@ -212,8 +298,7 @@ function timestampName(date = new Date()) {
 function downloadExport() {
   resetNotice()
   try {
-    const text = snapshotJson()
-    const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+    const blob = new Blob([snapshotJson()], { type: 'application/json;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -246,7 +331,7 @@ async function importFile(event) {
     if (!confirmed) return
 
     const root = extractSnapshotRoot(payload)
-    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(root))
+    safeStorageSet(DATA_STORAGE_KEY, JSON.stringify(root))
     setNotice('success', '备份数据已写入本地，页面即将刷新。')
     window.setTimeout(() => {
       window.location.hash = '#/group/root'
@@ -269,12 +354,7 @@ async function backupToGitHub() {
     const endpoint = `https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repository)}/contents/${encodePath(filePath)}`
     const response = await fetch(endpoint, {
       method: 'PUT',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${pat.value.trim()}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-      },
+      headers: githubHeaders(pat.value.trim(), true),
       body: JSON.stringify({
         message: `data(backup): 保存账号数据快照 ${now.toISOString()} | Save account data snapshot`,
         content: encodeBase64Utf8(snapshotJson()),
@@ -289,8 +369,7 @@ async function backupToGitHub() {
     }
 
     const fallbackUrl = `${repositoryUrl.value}/blob/${encodePath(target.branch)}/${encodePath(filePath)}`
-    const url = payload.content?.html_url || fallbackUrl
-    setNotice('success', `备份成功：${filePath}`, url)
+    setNotice('success', `备份成功：${filePath}`, payload.content?.html_url || fallbackUrl)
     if (!rememberPat.value) pat.value = ''
   } catch (error) {
     setNotice('error', error.message || 'GitHub 备份失败。')
@@ -362,11 +441,24 @@ async function backupToGitHub() {
         </div>
 
         <div class="security-note">
-          保存 PAT 会提高便利性，但 localStorage 不加密，同源页面脚本可以读取。请仅在个人可信设备使用，并采用只允许该仓库 Contents 读写、设置过期时间的细粒度令牌。PAT 仍不会进入导出 JSON、账号备份文件或提交信息。
+          “测试 PAT”不会创建文件：它只读取仓库、目标分支和目标目录，并检查 GitHub 返回的写入权限标记。保存 PAT 会提高便利性，但 localStorage 不加密；请仅在个人可信设备使用，并采用只允许该仓库 Contents 读写、设置过期时间的细粒度令牌。
         </div>
 
         <div class="backup-action-row end">
-          <button class="button primary" type="button" :disabled="busy" @click="backupToGitHub">
+          <button
+            class="button secondary"
+            type="button"
+            :disabled="busy || testingPat"
+            @click="testPat"
+          >
+            {{ testingPat ? '正在测试…' : '测试 PAT 与目标配置' }}
+          </button>
+          <button
+            class="button primary"
+            type="button"
+            :disabled="busy || testingPat"
+            @click="backupToGitHub"
+          >
             {{ busy ? '正在备份…' : '立即备份到 GitHub' }}
           </button>
         </div>
@@ -374,17 +466,19 @@ async function backupToGitHub() {
 
       <div v-if="notice.text" class="backup-notice" :class="notice.type" role="status">
         <span>{{ notice.text }}</span>
-        <a v-if="notice.url" :href="notice.url" target="_blank" rel="noreferrer">查看备份文件</a>
+        <a v-if="notice.url" :href="notice.url" target="_blank" rel="noreferrer">打开相关位置</a>
       </div>
 
-      <footer class="backup-footer"><button class="button secondary" type="button" @click="emit('close')">关闭</button></footer>
+      <footer class="backup-footer">
+        <button class="button secondary" type="button" @click="emit('close')">关闭</button>
+      </footer>
     </section>
   </div>
 </template>
 
 <style scoped>
 .backup-backdrop { z-index: 80; padding: 24px; overflow-y: auto; }
-.backup-modal { width: min(820px, 100%); max-height: calc(100vh - 48px); margin: auto; overflow-y: auto; border: 1px solid rgba(46, 69, 111, .14); border-radius: 28px; background: #fff; box-shadow: 0 30px 80px rgba(20, 35, 66, .28); }
+.backup-modal { width: min(820px, 100%); max-height: calc(100dvh - 48px); margin: auto; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(46, 69, 111, .14); border-radius: 28px; background: #fff; box-shadow: 0 30px 80px rgba(20, 35, 66, .28); }
 .backup-heading { display: flex; justify-content: space-between; gap: 24px; padding: 28px 30px 24px; color: #fff; background: linear-gradient(135deg, #1b2e52, #31588f); }
 .backup-heading h2 { margin: 5px 0 8px; font-size: clamp(24px, 4vw, 34px); }
 .backup-heading p { max-width: 620px; margin: 0; color: rgba(255, 255, 255, .78); line-height: 1.65; }
@@ -420,7 +514,7 @@ async function backupToGitHub() {
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 640px) {
   .backup-backdrop { padding: 10px; }
-  .backup-modal { max-height: calc(100vh - 20px); border-radius: 20px; }
+  .backup-modal { max-height: calc(100dvh - 20px); border-radius: 20px; }
   .backup-heading { padding: 22px 20px; }
   .backup-summary { padding: 16px 18px 0; gap: 8px; }
   .backup-summary span { padding: 12px 10px; }
