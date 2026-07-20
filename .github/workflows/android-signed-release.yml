@@ -1,0 +1,205 @@
+name: Android Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version using X.0.Y, for example 1.0.0'
+        required: true
+        default: '1.0.0'
+  push:
+    tags:
+      - 'android-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wangzhe-account-manager-android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signed-release:
+    name: Build signed APK and AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Resolve release version
+        id: release
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.release_version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
+            version="${GITHUB_REF_NAME#android-v}"
+          else
+            version="$DISPATCH_VERSION"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.0\.[0-9]+$ ]]; then
+            echo "::error::Release version must use X.0.Y, actual: $version"
+            exit 1
+          fi
+          tag="android-v${version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "apk_name=WangZheAccountManager-v${version}.apk" >> "$GITHUB_OUTPUT"
+          echo "aab_name=WangZheAccountManager-v${version}.aab" >> "$GITHUB_OUTPUT"
+
+      - name: Apply release version without committing
+        run: npm version "${{ steps.release.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Verify release version
+        run: npm run verify:version
+        env:
+          RELEASE_TAG: v${{ steps.release.outputs.version }}
+
+      - name: Build web assets and sync Android
+        run: npm run sync:android
+
+      - name: Restore signing keystore from Repository secrets
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!variable:-}" ]; then
+              echo "::error::Missing Repository secret: $variable"
+              exit 1
+            fi
+          done
+
+          keystore_path="${RUNNER_TEMP}/wangzhe-account-manager-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+
+          keytool -list \
+            -keystore "$keystore_path" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" >/dev/null
+
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore_path"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "mode=Repository fixed keystore" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed Release APK and AAB
+        working-directory: android
+        run: |
+          set -euo pipefail
+          gradle assembleRelease bundleRelease
+
+      - name: Verify signatures and prepare assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk_source="android/app/build/outputs/apk/release/app-release.apk"
+          aab_source="android/app/build/outputs/bundle/release/app-release.aab"
+          test -f "$apk_source"
+          test -f "$aab_source"
+
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          apksigner_path="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$apksigner_path"
+          "$apksigner_path" verify --verbose --print-certs "$apk_source"
+          jarsigner -verify -strict -certs "$aab_source"
+
+          output_dir="${RUNNER_TEMP}/android-release"
+          mkdir -p "$output_dir"
+          apk_path="$output_dir/${{ steps.release.outputs.apk_name }}"
+          aab_path="$output_dir/${{ steps.release.outputs.aab_name }}"
+          cp "$apk_source" "$apk_path"
+          cp "$aab_source" "$aab_path"
+          sha256sum "$apk_path" "$aab_path" > "$output_dir/SHA256SUMS.txt"
+
+          echo "directory=$output_dir" >> "$GITHUB_OUTPUT"
+          echo "apk=$apk_path" >> "$GITHUB_OUTPUT"
+          echo "aab=$aab_path" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag for manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists. Choose a new version."
+            exit 1
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "$tag"
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          cat > "${RUNNER_TEMP}/release-notes.md" <<'NOTES'
+          王者多账号管理器 Android 固定签名版本。
+
+          - 技术栈：Vue 3 + Vite + Capacitor 7
+          - 输出：已签名 APK、已签名 Android App Bundle、SHA-256 校验文件
+          - 包名：com.foxmaybe.wangzheaccountmanager
+          - 最低 Android：API 23（Android 6.0）
+          - 目标 Android：API 35
+          - 签名来源：Repository secrets 中保存的固定 keystore
+          NOTES
+
+      - name: Upload signed build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangZheAccountManager-v${{ steps.release.outputs.version }}-signed
+          path: ${{ steps.assets.outputs.directory }}/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: 王者多账号管理器 Android v${{ steps.release.outputs.version }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          prerelease: true
+          make_latest: false
+          files: |
+            ${{ steps.assets.outputs.apk }}
+            ${{ steps.assets.outputs.aab }}
+            ${{ steps.assets.outputs.directory }}/SHA256SUMS.txt
