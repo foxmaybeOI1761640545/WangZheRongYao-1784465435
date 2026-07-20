@@ -149,7 +149,6 @@ function skinCount(value) {
 
             <span class="compact-server-meta">
               <span>Lv.{{ server.accountLevel }}</span>
-              <span class="compact-rank-mark" aria-hidden="true">Ⅲ</span>
               <span>{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
               <span>战令 {{ server.battlePassLevel }}</span>
               <span>农场 {{ server.farmLevel }}</span>
