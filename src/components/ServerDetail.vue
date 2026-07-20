@@ -283,7 +283,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('accountId')"
           @keydown="quickCardKeydown($event, 'accountId')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">账号 ID</span>
           <strong>{{ server.accountId || '未填写' }}</strong>
           <p>{{ systemLabel }} · {{ platformLabel }} · {{ server.serverName }}</p>
@@ -297,7 +296,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('accountLevel')"
           @keydown="quickCardKeydown($event, 'accountLevel')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">账号等级</span>
           <strong>{{ server.accountLevel }}</strong>
           <p>当前游戏账号等级</p>
@@ -311,7 +309,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('battlePassLevel')"
           @keydown="quickCardKeydown($event, 'battlePassLevel')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">战令等级</span>
           <strong>{{ server.battlePassLevel }}</strong>
           <p>当前赛季战令进度</p>
@@ -325,7 +322,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('farmLevel')"
           @keydown="quickCardKeydown($event, 'farmLevel')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">农场等级</span>
           <strong>{{ server.farmLevel }}</strong>
           <p>王者农场当前等级</p>
@@ -339,7 +335,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('cropType')"
           @keydown="quickCardKeydown($event, 'cropType')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">当前种植</span>
           <strong>{{ server.cropType }} 小时</strong>
           <p>仅记录 8 / 16 / 32 小时作物</p>
@@ -353,7 +348,6 @@ function quickCardKeydown(event, field) {
           @click="openQuickEdit('epicSkins')"
           @keydown="quickCardKeydown($event, 'epicSkins')"
         >
-          <span class="quick-edit-hint">点击修改</span>
           <span class="detail-label">史诗级以上皮肤</span>
           <div v-if="skinList.length" class="skin-list">
             <span v-for="skin in skinList" :key="skin" class="skin-chip">{{ skin }}</span>
