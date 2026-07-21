@@ -2,6 +2,20 @@ name: Android Signed Release
 
 on:
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Release and in-app update channel
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
+      mandatory:
+        description: Mark this update as mandatory
+        required: true
+        default: false
+        type: boolean
   push:
     branches:
       - future/1784566876/AndroidApp
@@ -17,6 +31,8 @@ jobs:
   signed-release:
     name: Build signed APK and AAB
     runs-on: ubuntu-latest
+    env:
+      UPDATE_REPOSITORY: ${{ github.repository }}
 
     steps:
       - name: Checkout
@@ -53,6 +69,9 @@ jobs:
       - name: Calculate branch release version and names
         id: release
         shell: bash
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && inputs.channel || 'beta' }}
+          REQUESTED_MANDATORY: ${{ github.event_name == 'workflow_dispatch' && inputs.mandatory || false }}
         run: |
           set -euo pipefail
           git fetch --tags --force
@@ -79,9 +98,16 @@ jobs:
             next_patch=$((max_patch + 1))
           fi
 
+          channel="${REQUESTED_CHANNEL:-beta}"
+          if [ "$channel" != "stable" ]; then channel="beta"; fi
+          mandatory="${REQUESTED_MANDATORY:-false}"
+          if [ "$mandatory" != "true" ]; then mandatory="false"; fi
+
           version="1.0.${next_patch}"
+          version_code=$((1000000 + next_patch))
           timestamp="$(TZ=Asia/Singapore date +'%Y%m%d-%H%M%S')"
           build_time="$(TZ=Asia/Singapore date +'%Y-%m-%d %H:%M:%S %Z')"
+          published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           tag="${timestamp}-${branch_slug}-v${version}"
           apk_name="WangZheAccountManager-${branch_slug}-v${version}.apk"
           aab_name="WangZheAccountManager-${branch_slug}-v${version}.aab"
@@ -90,11 +116,15 @@ jobs:
             echo "branch_name=${branch_name}"
             echo "branch_slug=${branch_slug}"
             echo "version=${version}"
+            echo "version_code=${version_code}"
             echo "tag=${tag}"
             echo "apk_name=${apk_name}"
             echo "aab_name=${aab_name}"
             echo "build_time=${build_time}"
+            echo "published_at=${published_at}"
             echo "release_commit=${release_commit}"
+            echo "channel=${channel}"
+            echo "mandatory=${mandatory}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Apply release version without committing
@@ -148,7 +178,7 @@ jobs:
           set -euo pipefail
           gradle assembleRelease bundleRelease
 
-      - name: Verify signatures and prepare assets
+      - name: Verify signatures and prepare update assets
         id: assets
         shell: bash
         run: |
@@ -163,10 +193,6 @@ jobs:
           test -x "$apksigner_path"
           "$apksigner_path" verify --verbose --print-certs "$apk_source"
 
-          # AAB is a JAR-signed archive. The fixed upload certificate is intentionally
-          # self-signed, so jarsigner -strict returns code 4 for trust-chain warnings
-          # even when the archive signature itself is valid. Verify integrity without
-          # -strict, then compare the embedded signer fingerprint with the keystore.
           aab_verify_log="${RUNNER_TEMP}/aab-jarsigner-verify.log"
           jarsigner -verify -verbose -certs "$aab_source" | tee "$aab_verify_log"
           grep -q "jar verified\." "$aab_verify_log"
@@ -193,19 +219,70 @@ jobs:
             echo "::error::AAB signer does not match the configured fixed keystore."
             exit 1
           fi
-          echo "AAB signature verified with the configured fixed keystore certificate."
 
           output_dir="${RUNNER_TEMP}/android-release"
           mkdir -p "$output_dir"
           apk_path="$output_dir/${{ steps.release.outputs.apk_name }}"
           aab_path="$output_dir/${{ steps.release.outputs.aab_name }}"
+          update_path="$output_dir/update.json"
           cp "$apk_source" "$apk_path"
           cp "$aab_source" "$aab_path"
+
+          apk_sha256="$(sha256sum "$apk_path" | awk '{print $1}')"
+          apk_size="$(stat -c '%s' "$apk_path")"
+          apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.release.outputs.tag }}/${{ steps.release.outputs.apk_name }}"
+          commit_subject="$(git log -1 --pretty=%s)"
+
+          VERSION="${{ steps.release.outputs.version }}" \
+          VERSION_CODE="${{ steps.release.outputs.version_code }}" \
+          CHANNEL="${{ steps.release.outputs.channel }}" \
+          MANDATORY="${{ steps.release.outputs.mandatory }}" \
+          PUBLISHED_AT="${{ steps.release.outputs.published_at }}" \
+          TAG="${{ steps.release.outputs.tag }}" \
+          BRANCH="${{ steps.release.outputs.branch_name }}" \
+          APK_URL="$apk_url" \
+          APK_SHA256="$apk_sha256" \
+          APK_SIZE="$apk_size" \
+          CERT_SHA256="$expected_cert_sha256" \
+          COMMIT_SUBJECT="$commit_subject" \
+          UPDATE_PATH="$update_path" \
+          python3 - <<'PY'
+          import json
+          import os
+
+          payload = {
+              "schemaVersion": 1,
+              "applicationId": "com.foxmaybe.wangzheaccountmanager",
+              "versionName": os.environ["VERSION"],
+              "versionCode": int(os.environ["VERSION_CODE"]),
+              "minimumSupportedVersionCode": 1_000_000,
+              "mandatory": os.environ["MANDATORY"].lower() == "true",
+              "channel": os.environ["CHANNEL"],
+              "publishedAt": os.environ["PUBLISHED_AT"],
+              "tag": os.environ["TAG"],
+              "branch": os.environ["BRANCH"],
+              "apkUrl": os.environ["APK_URL"],
+              "sha256": os.environ["APK_SHA256"],
+              "size": int(os.environ["APK_SIZE"]),
+              "signingCertificateSha256": os.environ["CERT_SHA256"].lower(),
+              "releaseNotes": [
+                  "支持应用内检查、下载和安装 Android 更新",
+                  "更新包会校验 SHA-256、包名、版本码和固定签名证书",
+                  os.environ["COMMIT_SUBJECT"],
+              ],
+          }
+          with open(os.environ["UPDATE_PATH"], "w", encoding="utf-8") as file:
+              json.dump(payload, file, ensure_ascii=False, indent=2)
+              file.write("\n")
+          PY
+
+          python3 -m json.tool "$update_path" >/dev/null
           sha256sum "$apk_path" "$aab_path" > "$output_dir/SHA256SUMS.txt"
 
           echo "directory=$output_dir" >> "$GITHUB_OUTPUT"
           echo "apk=$apk_path" >> "$GITHUB_OUTPUT"
           echo "aab=$aab_path" >> "$GITHUB_OUTPUT"
+          echo "update=$update_path" >> "$GITHUB_OUTPUT"
 
       - name: Create Git tag
         shell: bash
@@ -226,13 +303,16 @@ jobs:
           王者多账号管理器 Android 固定签名版本。
 
           - Branch: ${{ steps.release.outputs.branch_name }}
-          - Branch slug: ${{ steps.release.outputs.branch_slug }}
           - Version: ${{ steps.release.outputs.version }}
+          - versionCode: ${{ steps.release.outputs.version_code }}
+          - Update channel: ${{ steps.release.outputs.channel }}
+          - Mandatory update: ${{ steps.release.outputs.mandatory }}
           - Commit SHA: ${{ steps.release.outputs.release_commit }}
           - Tag: ${{ steps.release.outputs.tag }}
           - Build time: ${{ steps.release.outputs.build_time }}
           - APK filename: ${{ steps.release.outputs.apk_name }}
           - AAB filename: ${{ steps.release.outputs.aab_name }}
+          - Update manifest: update.json
           - 技术栈：Vue 3 + Vite + Capacitor 7
           - 包名：com.foxmaybe.wangzheaccountmanager
           - 最低 Android：API 23（Android 6.0）
@@ -255,9 +335,10 @@ jobs:
           target_commitish: ${{ steps.release.outputs.release_commit }}
           name: WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}
           body_path: ${{ runner.temp }}/release-notes.md
-          prerelease: true
-          make_latest: false
+          prerelease: ${{ steps.release.outputs.channel != 'stable' }}
+          make_latest: ${{ steps.release.outputs.channel == 'stable' }}
           files: |
             ${{ steps.assets.outputs.apk }}
             ${{ steps.assets.outputs.aab }}
+            ${{ steps.assets.outputs.update }}
             ${{ steps.assets.outputs.directory }}/SHA256SUMS.txt
