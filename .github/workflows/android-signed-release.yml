@@ -2,14 +2,9 @@ name: Android Signed Release
 
 on:
   workflow_dispatch:
-    inputs:
-      release_version:
-        description: 'Release version using X.0.Y, for example 1.0.0'
-        required: true
-        default: '1.0.0'
   push:
-    tags:
-      - 'android-v*'
+    branches:
+      - future/1784566876/AndroidApp
 
 permissions:
   contents: write
@@ -29,6 +24,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,27 +50,52 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Resolve release version
+      - name: Calculate branch release version and names
         id: release
         shell: bash
-        env:
-          DISPATCH_VERSION: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
-            version="${GITHUB_REF_NAME#android-v}"
+          git fetch --tags --force
+          release_commit="$(git rev-parse HEAD)"
+
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          branch_slug="$(printf '%s' "$branch_name" \
+            | sed -E 's#[/[:space:]]+#-#g; s#[^A-Za-z0-9._-]+#-#g; s#-+#-#g; s#^-+##; s#-+$##')"
+          if [ -z "$branch_slug" ]; then
+            branch_slug="branch"
+          fi
+
+          max_patch=""
+          while IFS= read -r existing_tag; do
+            patch="${existing_tag##*-${branch_slug}-v1.0.}"
+            if [[ "$patch" =~ ^[0-9]+$ ]] && { [ -z "$max_patch" ] || [ "$patch" -gt "$max_patch" ]; }; then
+              max_patch="$patch"
+            fi
+          done < <(git tag --list "*-${branch_slug}-v1.0.*")
+
+          if [ -z "$max_patch" ]; then
+            next_patch=0
           else
-            version="$DISPATCH_VERSION"
+            next_patch=$((max_patch + 1))
           fi
-          if [[ ! "$version" =~ ^[0-9]+\.0\.[0-9]+$ ]]; then
-            echo "::error::Release version must use X.0.Y, actual: $version"
-            exit 1
-          fi
-          tag="android-v${version}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "apk_name=WangZheAccountManager-v${version}.apk" >> "$GITHUB_OUTPUT"
-          echo "aab_name=WangZheAccountManager-v${version}.aab" >> "$GITHUB_OUTPUT"
+
+          version="1.0.${next_patch}"
+          timestamp="$(TZ=Asia/Singapore date +'%Y%m%d-%H%M%S')"
+          build_time="$(TZ=Asia/Singapore date +'%Y-%m-%d %H:%M:%S %Z')"
+          tag="${timestamp}-${branch_slug}-v${version}"
+          apk_name="WangZheAccountManager-${branch_slug}-v${version}.apk"
+          aab_name="WangZheAccountManager-${branch_slug}-v${version}.aab"
+
+          {
+            echo "branch_name=${branch_name}"
+            echo "branch_slug=${branch_slug}"
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "apk_name=${apk_name}"
+            echo "aab_name=${aab_name}"
+            echo "build_time=${build_time}"
+            echo "release_commit=${release_commit}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Apply release version without committing
         run: npm version "${{ steps.release.outputs.version }}" --no-git-tag-version --allow-same-version
@@ -155,27 +176,33 @@ jobs:
           echo "apk=$apk_path" >> "$GITHUB_OUTPUT"
           echo "aab=$aab_path" >> "$GITHUB_OUTPUT"
 
-      - name: Create tag for manual dispatch
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create Git tag
         shell: bash
         run: |
           set -euo pipefail
           tag="${{ steps.release.outputs.tag }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
-            echo "::error::Tag $tag already exists. Choose a new version."
+            echo "::error::Tag $tag already exists."
             exit 1
           fi
-          git tag "$tag" "$GITHUB_SHA"
+          git tag "$tag" "${{ steps.release.outputs.release_commit }}"
           git push origin "$tag"
 
       - name: Create release notes
         shell: bash
         run: |
-          cat > "${RUNNER_TEMP}/release-notes.md" <<'NOTES'
+          cat > "${RUNNER_TEMP}/release-notes.md" <<NOTES
           王者多账号管理器 Android 固定签名版本。
 
+          - Branch: ${{ steps.release.outputs.branch_name }}
+          - Branch slug: ${{ steps.release.outputs.branch_slug }}
+          - Version: ${{ steps.release.outputs.version }}
+          - Commit SHA: ${{ steps.release.outputs.release_commit }}
+          - Tag: ${{ steps.release.outputs.tag }}
+          - Build time: ${{ steps.release.outputs.build_time }}
+          - APK filename: ${{ steps.release.outputs.apk_name }}
+          - AAB filename: ${{ steps.release.outputs.aab_name }}
           - 技术栈：Vue 3 + Vite + Capacitor 7
-          - 输出：已签名 APK、已签名 Android App Bundle、SHA-256 校验文件
           - 包名：com.foxmaybe.wangzheaccountmanager
           - 最低 Android：API 23（Android 6.0）
           - 目标 Android：API 35
@@ -185,7 +212,7 @@ jobs:
       - name: Upload signed build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WangZheAccountManager-v${{ steps.release.outputs.version }}-signed
+          name: WangZheAccountManager-${{ steps.release.outputs.branch_slug }}-v${{ steps.release.outputs.version }}-signed
           path: ${{ steps.assets.outputs.directory }}/*
           if-no-files-found: error
           retention-days: 30
@@ -194,8 +221,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: 王者多账号管理器 Android v${{ steps.release.outputs.version }}
+          target_commitish: ${{ steps.release.outputs.release_commit }}
+          name: WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}
           body_path: ${{ runner.temp }}/release-notes.md
           prerelease: true
           make_latest: false
