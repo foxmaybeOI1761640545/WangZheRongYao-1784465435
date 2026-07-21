@@ -7,8 +7,11 @@
 }
 
 .compact-server-card {
-  min-height: 108px !important;
-  padding: 13px 44px 11px 14px !important;
+  display: grid !important;
+  align-content: center;
+  gap: 9px;
+  min-height: 96px !important;
+  padding: 12px 46px 11px 14px !important;
   border: 1px solid rgba(104, 153, 205, 0.48) !important;
   border-radius: 12px !important;
   color: #eef6ff !important;
@@ -17,6 +20,7 @@
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.06),
     0 7px 18px rgba(25, 51, 82, 0.14) !important;
+  text-align: left;
 }
 
 .compact-server-card:hover {
@@ -25,11 +29,11 @@
     linear-gradient(90deg, rgba(48, 91, 137, 1), rgba(55, 101, 151, 0.98)) !important;
 }
 
-.compact-server-title {
+.compact-server-content {
   display: grid;
-  grid-template-columns: 10px auto minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(0, 1fr) 34px auto;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -42,83 +46,72 @@
   transform: rotate(45deg);
 }
 
-.compact-server-title strong {
-  overflow: hidden;
+.compact-server-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.compact-server-name {
   color: #f6fbff;
   font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .compact-account-id {
-  overflow: hidden;
+  min-width: 0;
   color: rgba(226, 240, 255, 0.82);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
 }
 
-.compact-server-title .server-arrow {
+.compact-crop-code {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 233, 167, 0.72);
+  border-radius: 8px;
+  color: #17305a;
+  background: linear-gradient(145deg, #ffe295, #efbd4e);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.65),
+    0 5px 12px rgba(18, 35, 64, 0.2);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.compact-server-content .server-arrow {
   color: rgba(229, 241, 255, 0.72);
   font-size: 20px;
+  line-height: 1;
 }
 
-.compact-server-meta,
-.compact-server-extra {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  padding-left: 17px;
-}
-
-.compact-server-meta {
-  margin-top: 8px;
+.compact-farm-level {
+  padding-left: 18px;
   color: rgba(211, 228, 248, 0.84);
   font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
-.compact-server-meta span:not(:last-child)::after {
-  margin-left: 8px;
-  color: rgba(183, 207, 234, 0.42);
-  content: "·";
-}
-
-.compact-rank-mark {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 17px;
-  padding: 0 3px;
-  border-radius: 4px 4px 7px 7px;
-  color: #d8ffe3;
-  background: linear-gradient(180deg, #137343, #0d4e30);
-  box-shadow: inset 0 0 0 1px rgba(157, 255, 196, 0.28);
-  font-family: Georgia, serif;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.compact-server-extra {
-  margin-top: 7px;
-  justify-content: space-between;
-  color: rgba(191, 216, 242, 0.67);
-  font-size: 10px;
-}
-
-.compact-server-extra span {
-  overflow: hidden;
-  max-width: 50%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.card-delete {
+  border-radius: 50% !important;
+  font-size: 21px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
 }
 
 .compact-server-shell .server-card-delete {
   top: 8px;
   right: 8px;
-  width: 29px;
-  height: 29px;
+  width: 30px;
+  height: 30px;
   border-color: rgba(255, 145, 154, 0.46);
   color: #ffd8dc;
   background: rgba(113, 24, 39, 0.76);
@@ -152,16 +145,17 @@
   }
 
   .compact-server-card {
-    min-height: 104px !important;
-    padding: 11px 38px 10px 11px !important;
+    min-height: 94px !important;
+    gap: 7px;
+    padding: 10px 40px 9px 11px !important;
   }
 
-  .compact-server-title {
-    grid-template-columns: 9px auto minmax(0, 1fr) auto;
-    gap: 5px;
+  .compact-server-content {
+    grid-template-columns: 9px minmax(0, 1fr) 30px auto;
+    gap: 6px;
   }
 
-  .compact-server-title strong {
+  .compact-server-name {
     font-size: 12px;
   }
 
@@ -169,32 +163,24 @@
     font-size: 10px;
   }
 
-  .compact-server-meta,
-  .compact-server-extra {
-    gap: 3px 5px;
-    padding-left: 14px;
+  .compact-crop-code {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    font-size: 15px;
   }
 
-  .compact-server-meta {
-    margin-top: 7px;
-    font-size: 9px;
-  }
-
-  .compact-server-meta span:not(:last-child)::after {
-    margin-left: 5px;
-  }
-
-  .compact-server-extra {
-    margin-top: 6px;
-    font-size: 9px;
+  .compact-farm-level {
+    padding-left: 15px;
+    font-size: 10px;
   }
 
   .compact-server-shell .server-card-delete {
     top: 6px;
     right: 6px;
-    width: 27px;
-    height: 27px;
-    font-size: 10px;
+    width: 28px;
+    height: 28px;
+    font-size: 19px !important;
   }
 
   .app-footer::before {
@@ -205,24 +191,18 @@
 
 @media (max-width: 360px) {
   .compact-server-card {
-    min-height: 110px !important;
+    min-height: 98px !important;
   }
 
-  .compact-server-title {
-    grid-template-columns: 8px minmax(0, 1fr) auto;
+  .compact-server-content {
+    grid-template-columns: 8px minmax(0, 1fr) 28px auto;
+    gap: 5px;
   }
 
-  .compact-account-id {
-    grid-column: 2 / -1;
-    padding-right: 25px;
-  }
-
-  .compact-server-extra span:last-child {
-    display: none;
-  }
-
-  .compact-server-extra span {
-    max-width: 100%;
+  .compact-crop-code {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 
   .app-footer::before {
