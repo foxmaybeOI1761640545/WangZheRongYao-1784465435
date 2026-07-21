@@ -162,7 +162,38 @@ jobs:
           apksigner_path="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -print | sort -V | tail -n 1)"
           test -x "$apksigner_path"
           "$apksigner_path" verify --verbose --print-certs "$apk_source"
-          jarsigner -verify -strict -certs "$aab_source"
+
+          # AAB is a JAR-signed archive. The fixed upload certificate is intentionally
+          # self-signed, so jarsigner -strict returns code 4 for trust-chain warnings
+          # even when the archive signature itself is valid. Verify integrity without
+          # -strict, then compare the embedded signer fingerprint with the keystore.
+          aab_verify_log="${RUNNER_TEMP}/aab-jarsigner-verify.log"
+          jarsigner -verify -verbose -certs "$aab_source" | tee "$aab_verify_log"
+          grep -q "jar verified\." "$aab_verify_log"
+
+          expected_cert_sha256="$(
+            keytool -list -v \
+              -keystore "$ANDROID_KEYSTORE_PATH" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              | awk -F': ' '/SHA256:/{print $2; exit}' \
+              | tr -d '[:space:]:'
+          )"
+          actual_cert_sha256="$(
+            keytool -printcert -jarfile "$aab_source" \
+              | awk -F': ' '/SHA256:/{print $2; exit}' \
+              | tr -d '[:space:]:'
+          )"
+
+          if [ -z "$expected_cert_sha256" ] || [ -z "$actual_cert_sha256" ]; then
+            echo "::error::Unable to read the AAB signing certificate fingerprint."
+            exit 1
+          fi
+          if [ "$expected_cert_sha256" != "$actual_cert_sha256" ]; then
+            echo "::error::AAB signer does not match the configured fixed keystore."
+            exit 1
+          fi
+          echo "AAB signature verified with the configured fixed keystore certificate."
 
           output_dir="${RUNNER_TEMP}/android-release"
           mkdir -p "$output_dir"
