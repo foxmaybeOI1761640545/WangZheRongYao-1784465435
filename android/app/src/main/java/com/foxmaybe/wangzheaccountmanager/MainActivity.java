@@ -9,12 +9,13 @@ import com.getcapacitor.BridgeActivity;
 /**
  * 王者多账号管理器的 Android Capacitor 容器。
  *
- * 业务与路由保留在 Vue 层；Activity 负责 WebView 容器、系统栏配色和禁止边缘回弹。
- * 系统返回键通过 @capacitor/app 回传给前端，由前端按弹窗、编辑态和页面历史处理。
+ * 业务与路由保留在 Vue 层；Activity 负责 WebView 容器、系统栏配色、禁止边缘回弹，
+ * 并注册原生版本更新插件。系统返回键通过 @capacitor/app 回传给前端处理。
  */
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
 
         getWindow().setStatusBarColor(Color.parseColor("#1D3157"));
