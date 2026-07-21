@@ -1,17 +1,30 @@
 {
-  "name": "codextest-202606221153",
+  "name": "wangzhe-account-manager",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "build:android": "vite build --base ./",
+    "preview": "vite preview --host 0.0.0.0",
+    "sync:android": "npm run build:android && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "npm run sync:android && cd android && gradle assembleDebug",
+    "android:release": "npm run sync:android && cd android && gradle assembleRelease",
+    "android:bundle": "npm run sync:android && cd android && gradle bundleRelease",
+    "verify:version": "node scripts/verify-release-version.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-vue": "latest",
-    "vite": "latest",
-    "vue": "latest"
+    "@capacitor/app": "7.1.2",
+    "@capacitor/core": "7.6.7",
+    "vue": "3.5.39"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@capacitor/android": "7.6.7",
+    "@capacitor/cli": "7.6.7",
+    "@vitejs/plugin-vue": "6.0.7",
+    "typescript": "6.0.3",
+    "vite": "8.1.0"
+  }
 }

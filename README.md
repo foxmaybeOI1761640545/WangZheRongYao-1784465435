@@ -1,20 +1,51 @@
 # 王者多账号管理器
 
-Vue 3 + Vite 多账号分组管理应用，支持递归分组、区服资料维护、本地 JSON 导出与 GitHub 独立分支备份。
+Vue 3 + Vite 多账号分组管理应用，支持递归分组、区服资料维护、本地 JSON 导出、GitHub 独立分支备份以及 Capacitor Android 原生封装。
 
-## 开发
+## Web 开发
 
 ```bash
-npm ci
+npm install
 npm run dev
 ```
 
-## 构建
+## Web 构建
 
 ```bash
 npm run build
 npm run preview
 ```
+
+## Android 开发
+
+安卓端采用 Vue 3 + Vite + Capacitor 7，固定包名：
+
+```text
+com.foxmaybe.wangzheaccountmanager
+```
+
+常用命令：
+
+```bash
+npm install
+npm run sync:android
+npm run android:debug
+npm run android:open
+```
+
+Android 版本包含：
+
+- 系统返回键按弹窗、编辑态、上一页面顺序处理；
+- 普通输入框按回车跳转到下一字段，最后字段提交；
+- `adjustResize`、动态视口和安全区域适配；
+- 软键盘压缩高度时自动收紧固定区域；
+- Debug APK 自动构建校验；
+- 使用固定 Repository Secrets 签名 APK 与 AAB 并发布 GitHub Release。
+
+详细说明见：
+
+- [Android 工程与交互说明](docs/ANDROID.md)
+- [Android 固定签名配置](docs/ANDROID_SIGNING.md)
 
 ## 数据与备份
 

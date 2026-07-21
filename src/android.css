@@ -1,0 +1,137 @@
+/* Android WebView 细节：保持字号稳定，并避免点击高亮与长按选择破坏按钮观感。 */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  scroll-margin-top: 88px;
+  scroll-margin-bottom: 132px;
+}
+
+/* Capacitor 原生容器始终使用动态视口与安全区域，避免状态栏、导航栏和软键盘遮挡。 */
+html.capacitor-native,
+html.capacitor-native body,
+html.capacitor-native #app {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.capacitor-native body {
+  position: fixed;
+  inset: 0;
+}
+
+html.capacitor-native .app-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+}
+
+html.capacitor-native .app-header {
+  padding-top: calc(10px + env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+html.capacitor-native .main-surface {
+  min-height: 0;
+  scroll-padding-top: 16px;
+  scroll-padding-bottom: 120px;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.capacitor-native .app-footer {
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: calc(9px + env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+html.capacitor-native .modal-backdrop {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+html.capacitor-native .modal-backdrop > .modal,
+html.capacitor-native .modal-backdrop > section,
+html.capacitor-native .modal-backdrop > form {
+  max-width: 100%;
+  max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.capacitor-native .field input,
+html.capacitor-native .field select,
+html.capacitor-native .field textarea {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+html.capacitor-native .button,
+html.capacitor-native .icon-button,
+html.capacitor-native .mini-button {
+  min-height: 44px;
+}
+
+/* 软键盘压缩可用高度时减少固定区域占用，让当前字段和提交按钮保持可见。 */
+@media (max-height: 680px) {
+  html.capacitor-native .app-header {
+    padding-top: calc(6px + env(safe-area-inset-top));
+    padding-bottom: 6px;
+  }
+
+  html.capacitor-native .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  html.capacitor-native .brand-copy small,
+  html.capacitor-native .app-footer {
+    display: none;
+  }
+
+  html.capacitor-native .main-surface {
+    margin: 4px;
+    padding: 10px;
+  }
+
+  html.capacitor-native .modal {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  html.capacitor-native .modal-backdrop {
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+
+  html.capacitor-native .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html.capacitor-native .field.full {
+    grid-column: auto;
+  }
+
+  html.capacitor-native .modal-actions,
+  html.capacitor-native .editor-actions,
+  html.capacitor-native .settings-footer {
+    flex-wrap: wrap;
+  }
+}

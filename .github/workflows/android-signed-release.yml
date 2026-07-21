@@ -1,0 +1,344 @@
+name: Android Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release and in-app update channel
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
+      mandatory:
+        description: Mark this update as mandatory
+        required: true
+        default: false
+        type: boolean
+  push:
+    branches:
+      - future/1784566876/AndroidApp
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wangzhe-account-manager-android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signed-release:
+    name: Build signed APK and AAB
+    runs-on: ubuntu-latest
+    env:
+      UPDATE_REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Calculate branch release version and names
+        id: release
+        shell: bash
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && inputs.channel || 'beta' }}
+          REQUESTED_MANDATORY: ${{ github.event_name == 'workflow_dispatch' && inputs.mandatory || false }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          release_commit="$(git rev-parse HEAD)"
+
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          branch_slug="$(printf '%s' "$branch_name" \
+            | sed -E 's#[/[:space:]]+#-#g; s#[^A-Za-z0-9._-]+#-#g; s#-+#-#g; s#^-+##; s#-+$##')"
+          if [ -z "$branch_slug" ]; then
+            branch_slug="branch"
+          fi
+
+          max_patch=""
+          while IFS= read -r existing_tag; do
+            patch="${existing_tag##*-${branch_slug}-v1.0.}"
+            if [[ "$patch" =~ ^[0-9]+$ ]] && { [ -z "$max_patch" ] || [ "$patch" -gt "$max_patch" ]; }; then
+              max_patch="$patch"
+            fi
+          done < <(git tag --list "*-${branch_slug}-v1.0.*")
+
+          if [ -z "$max_patch" ]; then
+            next_patch=0
+          else
+            next_patch=$((max_patch + 1))
+          fi
+
+          channel="${REQUESTED_CHANNEL:-beta}"
+          if [ "$channel" != "stable" ]; then channel="beta"; fi
+          mandatory="${REQUESTED_MANDATORY:-false}"
+          if [ "$mandatory" != "true" ]; then mandatory="false"; fi
+
+          version="1.0.${next_patch}"
+          version_code=$((1000000 + next_patch))
+          timestamp="$(TZ=Asia/Singapore date +'%Y%m%d-%H%M%S')"
+          build_time="$(TZ=Asia/Singapore date +'%Y-%m-%d %H:%M:%S %Z')"
+          published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          tag="${timestamp}-${branch_slug}-v${version}"
+          apk_name="WangZheAccountManager-${branch_slug}-v${version}.apk"
+          aab_name="WangZheAccountManager-${branch_slug}-v${version}.aab"
+
+          {
+            echo "branch_name=${branch_name}"
+            echo "branch_slug=${branch_slug}"
+            echo "version=${version}"
+            echo "version_code=${version_code}"
+            echo "tag=${tag}"
+            echo "apk_name=${apk_name}"
+            echo "aab_name=${aab_name}"
+            echo "build_time=${build_time}"
+            echo "published_at=${published_at}"
+            echo "release_commit=${release_commit}"
+            echo "channel=${channel}"
+            echo "mandatory=${mandatory}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply release version without committing
+        run: npm version "${{ steps.release.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Verify release version
+        run: npm run verify:version
+        env:
+          RELEASE_TAG: v${{ steps.release.outputs.version }}
+
+      - name: Build web assets and sync Android
+        run: npm run sync:android
+
+      - name: Restore signing keystore from Repository secrets
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!variable:-}" ]; then
+              echo "::error::Missing Repository secret: $variable"
+              exit 1
+            fi
+          done
+
+          keystore_path="${RUNNER_TEMP}/wangzhe-account-manager-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+
+          keytool -list \
+            -keystore "$keystore_path" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" >/dev/null
+
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore_path"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "mode=Repository fixed keystore" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed Release APK and AAB
+        working-directory: android
+        run: |
+          set -euo pipefail
+          gradle assembleRelease bundleRelease
+
+      - name: Verify signatures and prepare update assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk_source="android/app/build/outputs/apk/release/app-release.apk"
+          aab_source="android/app/build/outputs/bundle/release/app-release.aab"
+          test -f "$apk_source"
+          test -f "$aab_source"
+
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          apksigner_path="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$apksigner_path"
+          "$apksigner_path" verify --verbose --print-certs "$apk_source"
+
+          aab_verify_log="${RUNNER_TEMP}/aab-jarsigner-verify.log"
+          jarsigner -verify -verbose -certs "$aab_source" | tee "$aab_verify_log"
+          grep -q "jar verified\." "$aab_verify_log"
+
+          expected_cert_sha256="$(
+            keytool -list -v \
+              -keystore "$ANDROID_KEYSTORE_PATH" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              | awk -F': ' '/SHA256:/{print $2; exit}' \
+              | tr -d '[:space:]:'
+          )"
+          actual_cert_sha256="$(
+            keytool -printcert -jarfile "$aab_source" \
+              | awk -F': ' '/SHA256:/{print $2; exit}' \
+              | tr -d '[:space:]:'
+          )"
+
+          if [ -z "$expected_cert_sha256" ] || [ -z "$actual_cert_sha256" ]; then
+            echo "::error::Unable to read the AAB signing certificate fingerprint."
+            exit 1
+          fi
+          if [ "$expected_cert_sha256" != "$actual_cert_sha256" ]; then
+            echo "::error::AAB signer does not match the configured fixed keystore."
+            exit 1
+          fi
+
+          output_dir="${RUNNER_TEMP}/android-release"
+          mkdir -p "$output_dir"
+          apk_path="$output_dir/${{ steps.release.outputs.apk_name }}"
+          aab_path="$output_dir/${{ steps.release.outputs.aab_name }}"
+          update_path="$output_dir/update.json"
+          cp "$apk_source" "$apk_path"
+          cp "$aab_source" "$aab_path"
+
+          apk_sha256="$(sha256sum "$apk_path" | awk '{print $1}')"
+          apk_size="$(stat -c '%s' "$apk_path")"
+          apk_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.release.outputs.tag }}/${{ steps.release.outputs.apk_name }}"
+          commit_subject="$(git log -1 --pretty=%s)"
+
+          VERSION="${{ steps.release.outputs.version }}" \
+          VERSION_CODE="${{ steps.release.outputs.version_code }}" \
+          CHANNEL="${{ steps.release.outputs.channel }}" \
+          MANDATORY="${{ steps.release.outputs.mandatory }}" \
+          PUBLISHED_AT="${{ steps.release.outputs.published_at }}" \
+          TAG="${{ steps.release.outputs.tag }}" \
+          BRANCH="${{ steps.release.outputs.branch_name }}" \
+          APK_URL="$apk_url" \
+          APK_SHA256="$apk_sha256" \
+          APK_SIZE="$apk_size" \
+          CERT_SHA256="$expected_cert_sha256" \
+          COMMIT_SUBJECT="$commit_subject" \
+          UPDATE_PATH="$update_path" \
+          python3 - <<'PY'
+          import json
+          import os
+
+          payload = {
+              "schemaVersion": 1,
+              "applicationId": "com.foxmaybe.wangzheaccountmanager",
+              "versionName": os.environ["VERSION"],
+              "versionCode": int(os.environ["VERSION_CODE"]),
+              "minimumSupportedVersionCode": 1_000_000,
+              "mandatory": os.environ["MANDATORY"].lower() == "true",
+              "channel": os.environ["CHANNEL"],
+              "publishedAt": os.environ["PUBLISHED_AT"],
+              "tag": os.environ["TAG"],
+              "branch": os.environ["BRANCH"],
+              "apkUrl": os.environ["APK_URL"],
+              "sha256": os.environ["APK_SHA256"],
+              "size": int(os.environ["APK_SIZE"]),
+              "signingCertificateSha256": os.environ["CERT_SHA256"].lower(),
+              "releaseNotes": [
+                  "支持应用内检查、下载和安装 Android 更新",
+                  "更新包会校验 SHA-256、包名、版本码和固定签名证书",
+                  os.environ["COMMIT_SUBJECT"],
+              ],
+          }
+          with open(os.environ["UPDATE_PATH"], "w", encoding="utf-8") as file:
+              json.dump(payload, file, ensure_ascii=False, indent=2)
+              file.write("\n")
+          PY
+
+          python3 -m json.tool "$update_path" >/dev/null
+          sha256sum "$apk_path" "$aab_path" > "$output_dir/SHA256SUMS.txt"
+
+          echo "directory=$output_dir" >> "$GITHUB_OUTPUT"
+          echo "apk=$apk_path" >> "$GITHUB_OUTPUT"
+          echo "aab=$aab_path" >> "$GITHUB_OUTPUT"
+          echo "update=$update_path" >> "$GITHUB_OUTPUT"
+
+      - name: Create Git tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists."
+            exit 1
+          fi
+          git tag "$tag" "${{ steps.release.outputs.release_commit }}"
+          git push origin "$tag"
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          cat > "${RUNNER_TEMP}/release-notes.md" <<NOTES
+          王者多账号管理器 Android 固定签名版本。
+
+          - Branch: ${{ steps.release.outputs.branch_name }}
+          - Version: ${{ steps.release.outputs.version }}
+          - versionCode: ${{ steps.release.outputs.version_code }}
+          - Update channel: ${{ steps.release.outputs.channel }}
+          - Mandatory update: ${{ steps.release.outputs.mandatory }}
+          - Commit SHA: ${{ steps.release.outputs.release_commit }}
+          - Tag: ${{ steps.release.outputs.tag }}
+          - Build time: ${{ steps.release.outputs.build_time }}
+          - APK filename: ${{ steps.release.outputs.apk_name }}
+          - AAB filename: ${{ steps.release.outputs.aab_name }}
+          - Update manifest: update.json
+          - 技术栈：Vue 3 + Vite + Capacitor 7
+          - 包名：com.foxmaybe.wangzheaccountmanager
+          - 最低 Android：API 23（Android 6.0）
+          - 目标 Android：API 35
+          - 签名来源：Repository secrets 中保存的固定 keystore
+          NOTES
+
+      - name: Upload signed build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangZheAccountManager-${{ steps.release.outputs.branch_slug }}-v${{ steps.release.outputs.version }}-signed
+          path: ${{ steps.assets.outputs.directory }}/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ steps.release.outputs.release_commit }}
+          name: WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          prerelease: ${{ steps.release.outputs.channel != 'stable' }}
+          make_latest: ${{ steps.release.outputs.channel == 'stable' }}
+          files: |
+            ${{ steps.assets.outputs.apk }}
+            ${{ steps.assets.outputs.aab }}
+            ${{ steps.assets.outputs.update }}
+            ${{ steps.assets.outputs.directory }}/SHA256SUMS.txt
