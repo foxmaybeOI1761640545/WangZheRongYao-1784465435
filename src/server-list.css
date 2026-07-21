@@ -9,8 +9,8 @@
 .compact-server-card {
   display: grid !important;
   align-content: center;
-  gap: 9px;
-  min-height: 96px !important;
+  gap: 7px;
+  min-height: 108px !important;
   padding: 12px 46px 11px 14px !important;
   border: 1px solid rgba(104, 153, 205, 0.48) !important;
   border-radius: 12px !important;
@@ -29,39 +29,19 @@
     linear-gradient(90deg, rgba(48, 91, 137, 1), rgba(55, 101, 151, 0.98)) !important;
 }
 
-.compact-server-content {
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) 34px auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.server-status-diamond {
-  width: 9px;
-  height: 9px;
-  border: 1px solid rgba(255, 168, 168, 0.86);
-  background: #f33f47;
-  box-shadow: 0 0 8px rgba(255, 51, 68, 0.75);
-  transform: rotate(45deg);
-}
-
-.compact-server-copy {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
 .compact-server-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding-right: 2px;
   color: #f6fbff;
   font-size: 14px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 .compact-account-id {
+  display: block;
   min-width: 0;
-  color: rgba(226, 240, 255, 0.82);
+  color: rgba(226, 240, 255, 0.86);
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -69,35 +49,59 @@
   white-space: normal;
 }
 
+.compact-card-divider {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: rgba(205, 225, 247, 0.24);
+}
+
+.compact-server-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.compact-farm-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 30px;
+  color: rgba(220, 235, 252, 0.88);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.server-status-diamond {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 168, 168, 0.86);
+  background: #f33f47;
+  box-shadow: 0 0 8px rgba(255, 51, 68, 0.75);
+  transform: rotate(45deg);
+}
+
 .compact-crop-code {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
   border: 1px solid rgba(255, 233, 167, 0.72);
-  border-radius: 8px;
+  border-radius: 7px;
   color: #17305a;
   background: linear-gradient(145deg, #ffe295, #efbd4e);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.65),
     0 5px 12px rgba(18, 35, 64, 0.2);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 900;
   line-height: 1;
-}
-
-.compact-server-content .server-arrow {
-  color: rgba(229, 241, 255, 0.72);
-  font-size: 20px;
-  line-height: 1;
-}
-
-.compact-farm-level {
-  padding-left: 18px;
-  color: rgba(211, 228, 248, 0.84);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
 }
 
 .card-delete {
@@ -145,14 +149,9 @@
   }
 
   .compact-server-card {
-    min-height: 94px !important;
-    gap: 7px;
-    padding: 10px 40px 9px 11px !important;
-  }
-
-  .compact-server-content {
-    grid-template-columns: 9px minmax(0, 1fr) 30px auto;
+    min-height: 104px !important;
     gap: 6px;
+    padding: 10px 40px 9px 11px !important;
   }
 
   .compact-server-name {
@@ -163,16 +162,21 @@
     font-size: 10px;
   }
 
-  .compact-crop-code {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-    font-size: 15px;
+  .compact-farm-level {
+    min-height: 28px;
+    gap: 6px;
+    font-size: 10px;
   }
 
-  .compact-farm-level {
-    padding-left: 15px;
-    font-size: 10px;
+  .server-status-diamond {
+    width: 9px;
+    height: 9px;
+  }
+
+  .compact-crop-code {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 
   .compact-server-shell .server-card-delete {
@@ -191,18 +195,17 @@
 
 @media (max-width: 360px) {
   .compact-server-card {
-    min-height: 98px !important;
+    min-height: 106px !important;
   }
 
-  .compact-server-content {
-    grid-template-columns: 8px minmax(0, 1fr) 28px auto;
-    gap: 5px;
+  .compact-farm-level {
+    font-size: 9px;
   }
 
   .compact-crop-code {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
+    width: 27px;
+    height: 27px;
+    font-size: 13px;
   }
 
   .app-footer::before {
