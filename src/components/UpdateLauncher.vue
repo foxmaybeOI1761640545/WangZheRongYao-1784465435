@@ -45,7 +45,7 @@ watch(() => [state.available, state.latestVersionCode], ([available, code]) => {
       type="button"
       @click="panelOpen = true"
     >
-      ↻ {{ state.available ? '新版本' : '更新' }}
+      {{ state.available ? '新版本' : '更新' }}
     </button>
   </Teleport>
 
