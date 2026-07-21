@@ -4,6 +4,7 @@ import './layout.css'
 import './server-list.css'
 import './refinements.css'
 import './android.css'
+import './home-layout.css'
 import App from './App.vue'
 import UpdateLauncher from './components/UpdateLauncher.vue'
 import {
