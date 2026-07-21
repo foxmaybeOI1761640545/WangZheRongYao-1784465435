@@ -38,15 +38,16 @@ watch(() => [state.available, state.latestVersionCode], ([available, code]) => {
 </script>
 
 <template>
-  <button
-    v-if="isAndroid"
-    class="update-fab"
-    :class="{ available: state.available }"
-    type="button"
-    @click="panelOpen = true"
-  >
-    ↻ {{ state.available ? '新版本' : '更新' }}
-  </button>
+  <Teleport v-if="isAndroid" to=".app-header-tools">
+    <button
+      class="update-launch"
+      :class="{ available: state.available }"
+      type="button"
+      @click="panelOpen = true"
+    >
+      ↻ {{ state.available ? '新版本' : '更新' }}
+    </button>
+  </Teleport>
 
   <Teleport to="body">
     <div v-if="panelOpen" class="modal-backdrop update-backdrop" @click.self="panelOpen = false">
@@ -135,5 +136,5 @@ watch(() => [state.available, state.latestVersionCode], ([available, code]) => {
 </template>
 
 <style scoped>
-.update-fab{position:fixed;z-index:70;right:max(12px,env(safe-area-inset-right));bottom:calc(72px + env(safe-area-inset-bottom));min-height:44px;padding:8px 14px;border:1px solid #b7c7e7;border-radius:999px;color:#1d3157;background:#fff;box-shadow:0 10px 26px #1d315733;font:inherit;font-weight:800}.update-fab.available{color:#fff;border-color:#315fca;background:#315fca}.update-backdrop{z-index:120}.update-modal{width:min(600px,100%);max-height:min(86dvh,760px);overflow-y:auto}.version-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}.version-summary>div,.channel-row,.repository-card,.available-card,.up-to-date,.security-note{border:1px solid #dce4f2;border-radius:14px;background:#f8faff}.version-summary>div{display:grid;gap:3px;padding:13px}.version-summary .highlighted{border-color:#9db6ec;background:#eef4ff}.version-summary span,.repository-card span,.available-heading span{color:#6e7c94;font-size:12px}.version-summary strong,.available-heading strong{color:#18376f;font-size:22px}.channel-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-top:10px;padding:12px}.channel-row>span{display:grid;gap:3px}.channel-row small{color:#738097}.channel-row select{min-width:100px}.repository-card{display:grid;gap:4px;margin-top:10px;padding:12px;overflow-wrap:anywhere}.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.result{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5}.result.success{color:#17623e;background:#ebf8f0}.result.error{color:#962f40;background:#fff0f2}.result.info{color:#244778;background:#eef4ff}.available-card{margin-top:12px;padding:14px;background:#fff}.available-heading{display:flex;align-items:center;justify-content:space-between}.available-heading>div{display:grid}.available-heading>b{padding:5px 9px;border-radius:999px;color:#234c9b;background:#eaf1ff}.warning{padding:9px 11px;border-left:4px solid #d49a23;color:#7a5311;background:#fff6df}.release-notes{padding-left:20px;line-height:1.65;color:#4e5d75}.progress-box{display:grid;gap:7px}.progress-box progress{width:100%;accent-color:#315fca}.release-link{text-align:center;text-decoration:none}.up-to-date,.security-note{margin:12px 0 0;padding:12px;text-align:center;color:#607087}.security-note{color:#6b5a2c;background:#fff8e7;font-size:12px;line-height:1.55}@media(max-width:520px){.update-modal{max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}.action-grid{grid-template-columns:1fr}.update-fab{bottom:calc(68px + env(safe-area-inset-bottom));font-size:12px}}
+.update-backdrop{z-index:120}.update-modal{width:min(600px,100%);max-height:min(86dvh,760px);overflow-y:auto}.version-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}.version-summary>div,.channel-row,.repository-card,.available-card,.up-to-date,.security-note{border:1px solid #dce4f2;border-radius:14px;background:#f8faff}.version-summary>div{display:grid;gap:3px;padding:13px}.version-summary .highlighted{border-color:#9db6ec;background:#eef4ff}.version-summary span,.repository-card span,.available-heading span{color:#6e7c94;font-size:12px}.version-summary strong,.available-heading strong{color:#18376f;font-size:22px}.channel-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-top:10px;padding:12px}.channel-row>span{display:grid;gap:3px}.channel-row small{color:#738097}.channel-row select{min-width:100px}.repository-card{display:grid;gap:4px;margin-top:10px;padding:12px;overflow-wrap:anywhere}.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.result{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5}.result.success{color:#17623e;background:#ebf8f0}.result.error{color:#962f40;background:#fff0f2}.result.info{color:#244778;background:#eef4ff}.available-card{margin-top:12px;padding:14px;background:#fff}.available-heading{display:flex;align-items:center;justify-content:space-between}.available-heading>div{display:grid}.available-heading>b{padding:5px 9px;border-radius:999px;color:#234c9b;background:#eaf1ff}.warning{padding:9px 11px;border-left:4px solid #d49a23;color:#7a5311;background:#fff6df}.release-notes{padding-left:20px;line-height:1.65;color:#4e5d75}.progress-box{display:grid;gap:7px}.progress-box progress{width:100%;accent-color:#315fca}.release-link{text-align:center;text-decoration:none}.up-to-date,.security-note{margin:12px 0 0;padding:12px;text-align:center;color:#607087}.security-note{color:#6b5a2c;background:#fff8e7;font-size:12px;line-height:1.55}@media(max-width:520px){.update-modal{max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}.action-grid{grid-template-columns:1fr}}
 </style>
