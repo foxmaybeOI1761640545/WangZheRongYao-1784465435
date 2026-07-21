@@ -1,6 +1,5 @@
 <script setup>
 import { computed } from 'vue'
-import { PLATFORM_OPTIONS, SYSTEM_OPTIONS } from '../composables/useAccountStore.js'
 
 const props = defineProps({
   group: { type: Object, required: true },
@@ -21,19 +20,8 @@ const childGroups = computed(() => props.group.children.filter((item) => item.ty
 const servers = computed(() => props.group.children.filter((item) => item.type === 'server'))
 const isEmpty = computed(() => props.group.children.length === 0)
 
-function optionLabel(options, value) {
-  return options.find((item) => item.value === value)?.label ?? value
-}
-
-function platformPrefix(value) {
-  return value === 'wechat' ? '微信' : '手Q'
-}
-
-function skinCount(value) {
-  return String(value ?? '')
-    .split(/[，,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean).length
+function cropCode(value) {
+  return ({ 8: '8', 16: '1', 32: '3' })[String(value)] ?? '8'
 }
 </script>
 
@@ -118,7 +106,7 @@ function skinCount(value) {
             :title="`删除分组 ${item.name}`"
             @click="emit('delete-group', item.id)"
           >
-            删
+            ×
           </button>
         </div>
       </div>
@@ -140,24 +128,23 @@ function skinCount(value) {
             type="button"
             @click="emit('navigate-server', server.id)"
           >
-            <span class="compact-server-title">
+            <span class="compact-server-content">
               <span class="server-status-diamond" aria-hidden="true"></span>
-              <strong>{{ platformPrefix(server.platform) }}{{ server.serverName }}</strong>
-              <span class="compact-account-id">{{ server.accountId || '未填写账号 ID' }}</span>
-              <span class="server-arrow">›</span>
+              <span class="compact-server-copy">
+                <strong class="compact-server-name">{{ server.serverName }}</strong>
+                <span class="compact-account-id">ID：{{ server.accountId || '未填写' }}</span>
+              </span>
+              <span
+                class="compact-crop-code"
+                :aria-label="`${server.cropType} 小时作物`"
+                :title="`${server.cropType} 小时作物`"
+              >
+                {{ cropCode(server.cropType) }}
+              </span>
+              <span class="server-arrow" aria-hidden="true">›</span>
             </span>
 
-            <span class="compact-server-meta">
-              <span>Lv.{{ server.accountLevel }}</span>
-              <span>{{ optionLabel(SYSTEM_OPTIONS, server.system) }}</span>
-              <span>战令 {{ server.battlePassLevel }}</span>
-              <span>农场 {{ server.farmLevel }}</span>
-            </span>
-
-            <span class="compact-server-extra">
-              <span>{{ server.cropType }} 小时作物</span>
-              <span>{{ skinCount(server.epicSkins) ? `${skinCount(server.epicSkins)} 款史诗+皮肤` : '未记录皮肤' }}</span>
-            </span>
+            <span class="compact-farm-level">农场等级 {{ server.farmLevel }}</span>
           </button>
           <button
             class="card-delete server-card-delete"
@@ -166,7 +153,7 @@ function skinCount(value) {
             :title="`删除区服账号 ${server.serverName}`"
             @click="emit('delete-server', server.id)"
           >
-            删
+            ×
           </button>
         </div>
       </div>
