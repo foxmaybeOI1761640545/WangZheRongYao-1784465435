@@ -5,6 +5,7 @@ import './server-list.css'
 import './refinements.css'
 import './android.css'
 import App from './App.vue'
+import UpdateLauncher from './components/UpdateLauncher.vue'
 import {
   installFormEnterNavigation,
   installNativeBackBridge,
@@ -14,3 +15,8 @@ installFormEnterNavigation()
 void installNativeBackBridge()
 
 createApp(App).mount('#app')
+
+const updateRoot = document.createElement('div')
+updateRoot.id = 'app-update-root'
+document.body.appendChild(updateRoot)
+createApp(UpdateLauncher).mount(updateRoot)
