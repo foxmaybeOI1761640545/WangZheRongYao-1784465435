@@ -1,0 +1,126 @@
+.app-header-tools {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.backup-launch {
+  width: clamp(112px, 12vw, 132px);
+  min-width: 0 !important;
+  padding-inline: 10px !important;
+  text-align: center;
+}
+
+.update-launch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 78px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 9px;
+  border: 1px solid #dce3ed;
+  border-radius: 12px;
+  color: #31415d;
+  background: #f5f7fb;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.update-launch.available {
+  color: #fff;
+  border-color: #315fca;
+  background: #315fca;
+}
+
+.browser-view {
+  min-height: 100%;
+}
+
+.browser-fixed-top {
+  position: sticky;
+  top: -1px;
+  z-index: 8;
+  margin: -2px -2px 0;
+  padding: 2px 2px 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 18px -18px rgba(24, 46, 85, 0.48);
+}
+
+.browser-scroll-region {
+  min-width: 0;
+}
+
+.summary-lines {
+  display: grid;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.summary-lines span {
+  display: block;
+}
+
+@media (max-width: 760px) {
+  .app-header-tools {
+    gap: 5px;
+  }
+
+  .backup-launch {
+    width: 100px;
+    min-height: 42px;
+    padding-inline: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .update-launch {
+    width: 64px;
+    min-height: 42px;
+    padding-inline: 6px;
+    border-radius: 12px;
+    font-size: 10px;
+  }
+
+  .browser-fixed-top {
+    padding-bottom: 9px;
+  }
+
+  .summary-lines {
+    margin-top: 8px;
+    gap: 1px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 460px) {
+  .backup-launch {
+    width: 86px;
+    font-size: 9px !important;
+  }
+
+  .update-launch {
+    width: 58px;
+    gap: 3px;
+    font-size: 9px;
+  }
+
+  .app-header-tools .global-stats span {
+    min-width: 36px;
+    padding-inline: 4px;
+  }
+}
+
+@media (max-width: 350px) {
+  .app-header-tools {
+    width: 100%;
+  }
+
+  .backup-launch {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
