@@ -7,11 +7,13 @@
 }
 
 .compact-server-card {
+  position: relative;
   display: grid !important;
+  grid-template-rows: auto auto 1px auto;
   align-content: center;
   gap: 7px;
   min-height: 108px !important;
-  padding: 12px 46px 11px 14px !important;
+  padding: 12px !important;
   border: 1px solid rgba(104, 153, 205, 0.48) !important;
   border-radius: 12px !important;
   color: #eef6ff !important;
@@ -29,10 +31,14 @@
     linear-gradient(90deg, rgba(48, 91, 137, 1), rgba(55, 101, 151, 0.98)) !important;
 }
 
-.compact-server-name {
+.compact-server-name,
+.compact-account-id {
   min-width: 0;
+  padding-right: 42px;
+}
+
+.compact-server-name {
   overflow-wrap: anywhere;
-  padding-right: 2px;
   color: #f6fbff;
   font-size: 14px;
   line-height: 1.2;
@@ -40,7 +46,6 @@
 
 .compact-account-id {
   display: block;
-  min-width: 0;
   color: rgba(226, 240, 255, 0.86);
   font-size: 12px;
   line-height: 1.35;
@@ -59,9 +64,9 @@
 .compact-server-bottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
   min-width: 0;
+  min-height: 30px;
+  padding-right: 42px;
 }
 
 .compact-farm-level {
@@ -87,11 +92,13 @@
 }
 
 .compact-crop-code {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  flex: 0 0 auto;
   border: 1px solid rgba(255, 233, 167, 0.72);
   border-radius: 7px;
   color: #17305a;
@@ -112,8 +119,8 @@
 }
 
 .compact-server-shell .server-card-delete {
-  top: 8px;
-  right: 8px;
+  top: 12px;
+  right: 12px;
   width: 30px;
   height: 30px;
   border-color: rgba(255, 145, 154, 0.46);
@@ -151,7 +158,12 @@
   .compact-server-card {
     min-height: 104px !important;
     gap: 6px;
-    padding: 10px 40px 9px 11px !important;
+    padding: 10px !important;
+  }
+
+  .compact-server-name,
+  .compact-account-id {
+    padding-right: 38px;
   }
 
   .compact-server-name {
@@ -160,6 +172,11 @@
 
   .compact-account-id {
     font-size: 10px;
+  }
+
+  .compact-server-bottom {
+    min-height: 28px;
+    padding-right: 38px;
   }
 
   .compact-farm-level {
@@ -174,14 +191,16 @@
   }
 
   .compact-crop-code {
+    right: 10px;
+    bottom: 10px;
     width: 28px;
     height: 28px;
     font-size: 14px;
   }
 
   .compact-server-shell .server-card-delete {
-    top: 6px;
-    right: 6px;
+    top: 10px;
+    right: 10px;
     width: 28px;
     height: 28px;
     font-size: 19px !important;
@@ -206,6 +225,11 @@
     width: 27px;
     height: 27px;
     font-size: 13px;
+  }
+
+  .compact-server-shell .server-card-delete {
+    width: 27px;
+    height: 27px;
   }
 
   .app-footer::before {
