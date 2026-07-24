@@ -277,24 +277,14 @@ jobs:
           PY
 
           python3 -m json.tool "$update_path" >/dev/null
-          sha256sum "$apk_path" "$aab_path" > "$output_dir/SHA256SUMS.txt"
+          checksums_path="$output_dir/SHA256SUMS.txt"
+          sha256sum "$apk_path" "$aab_path" "$update_path" > "$checksums_path"
 
           echo "directory=$output_dir" >> "$GITHUB_OUTPUT"
           echo "apk=$apk_path" >> "$GITHUB_OUTPUT"
           echo "aab=$aab_path" >> "$GITHUB_OUTPUT"
           echo "update=$update_path" >> "$GITHUB_OUTPUT"
-
-      - name: Create Git tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-          if git rev-parse "$tag" >/dev/null 2>&1; then
-            echo "::error::Tag $tag already exists."
-            exit 1
-          fi
-          git tag "$tag" "${{ steps.release.outputs.release_commit }}"
-          git push origin "$tag"
+          echo "checksums=$checksums_path" >> "$GITHUB_OUTPUT"
 
       - name: Create release notes
         shell: bash
@@ -313,11 +303,13 @@ jobs:
           - APK filename: ${{ steps.release.outputs.apk_name }}
           - AAB filename: ${{ steps.release.outputs.aab_name }}
           - Update manifest: update.json
+          - Checksums: SHA256SUMS.txt
           - 技术栈：Vue 3 + Vite + Capacitor 7
           - 包名：com.foxmaybe.wangzheaccountmanager
           - 最低 Android：API 23（Android 6.0）
           - 目标 Android：API 35
           - 签名来源：Repository secrets 中保存的固定 keystore
+          - 发布方式：Draft Release 上传并核对全部资产后再发布
           NOTES
 
       - name: Upload signed build artifact
@@ -328,17 +320,225 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ steps.release.outputs.release_commit }}
-          name: WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}
-          body_path: ${{ runner.temp }}/release-notes.md
-          prerelease: ${{ steps.release.outputs.channel != 'stable' }}
-          make_latest: ${{ steps.release.outputs.channel == 'stable' }}
-          files: |
-            ${{ steps.assets.outputs.apk }}
-            ${{ steps.assets.outputs.aab }}
-            ${{ steps.assets.outputs.update }}
-            ${{ steps.assets.outputs.directory }}/SHA256SUMS.txt
+      - name: Create Git tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists."
+            exit 1
+          fi
+          git tag "$tag" "${{ steps.release.outputs.release_commit }}"
+          git push origin "$tag"
+
+      - name: Create draft GitHub Release
+        id: draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          title="WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}"
+
+          args=(
+            "$tag"
+            --repo "$GITHUB_REPOSITORY"
+            --draft
+            --verify-tag
+            --target "${{ steps.release.outputs.release_commit }}"
+            --title "$title"
+            --notes-file "${RUNNER_TEMP}/release-notes.md"
+          )
+          if [ "${{ steps.release.outputs.channel }}" != "stable" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "${args[@]}"
+
+          releases_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")"
+          release_id="$(
+            jq -r --arg tag "$tag" \
+              '.[] | select(.tag_name == $tag and .draft == true) | .id' \
+              <<<"$releases_json" | head -n 1
+          )"
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "::error::Draft release was created but its release ID could not be resolved."
+            exit 1
+          fi
+
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "Draft release ID: $release_id"
+
+      - name: Upload assets to draft Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ steps.release.outputs.tag }}" \
+            "${{ steps.assets.outputs.apk }}" \
+            "${{ steps.assets.outputs.aab }}" \
+            "${{ steps.assets.outputs.update }}" \
+            "${{ steps.assets.outputs.checksums }}" \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify all draft Release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_id="${{ steps.draft.outputs.release_id }}"
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}")"
+          if [ "$(jq -r '.draft' <<<"$release_json")" != "true" ]; then
+            echo "::error::The release became public before asset verification completed."
+            exit 1
+          fi
+
+          assets_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100")"
+          expected_files=(
+            "${{ steps.assets.outputs.apk }}"
+            "${{ steps.assets.outputs.aab }}"
+            "${{ steps.assets.outputs.update }}"
+            "${{ steps.assets.outputs.checksums }}"
+          )
+
+          if [ "$(jq 'length' <<<"$assets_json")" -ne "${#expected_files[@]}" ]; then
+            echo "::error::Draft release does not contain exactly ${#expected_files[@]} assets."
+            jq -r '.[].name' <<<"$assets_json"
+            exit 1
+          fi
+
+          for file in "${expected_files[@]}"; do
+            name="$(basename "$file")"
+            matches="$(jq --arg name "$name" '[.[] | select(.name == $name)] | length' <<<"$assets_json")"
+            if [ "$matches" -ne 1 ]; then
+              echo "::error::Expected exactly one uploaded asset named $name."
+              exit 1
+            fi
+
+            state="$(jq -r --arg name "$name" '.[] | select(.name == $name) | .state' <<<"$assets_json")"
+            remote_size="$(jq -r --arg name "$name" '.[] | select(.name == $name) | .size' <<<"$assets_json")"
+            remote_digest="$(jq -r --arg name "$name" '.[] | select(.name == $name) | (.digest // "")' <<<"$assets_json")"
+            local_size="$(stat -c '%s' "$file")"
+            local_digest="sha256:$(sha256sum "$file" | awk '{print $1}')"
+
+            if [ "$state" != "uploaded" ]; then
+              echo "::error::Release asset $name is not in the uploaded state."
+              exit 1
+            fi
+            if [ "$remote_size" != "$local_size" ]; then
+              echo "::error::Release asset $name size mismatch: remote=$remote_size local=$local_size."
+              exit 1
+            fi
+            if [ -n "$remote_digest" ] && [ "$remote_digest" != "$local_digest" ]; then
+              echo "::error::Release asset $name digest mismatch."
+              exit 1
+            fi
+          done
+
+          echo "All four draft release assets are present and verified."
+
+      - name: Publish verified draft Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          if [ "${{ steps.release.outputs.channel }}" = "stable" ]; then
+            gh release edit "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --latest
+          else
+            gh release edit "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false
+          fi
+
+      - name: Verify published immutable Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          release_json="$(gh release view "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isImmutable,isPrerelease,url,assets)"
+
+          if [ "$(jq -r '.isDraft' <<<"$release_json")" != "false" ]; then
+            echo "::error::Release is still a draft after the publish step."
+            exit 1
+          fi
+          if [ "$(jq '.assets | length' <<<"$release_json")" -ne 4 ]; then
+            echo "::error::Published release does not contain all four assets."
+            exit 1
+          fi
+
+          expected_prerelease="${{ steps.release.outputs.channel != 'stable' }}"
+          if [ "$(jq -r '.isPrerelease' <<<"$release_json")" != "$expected_prerelease" ]; then
+            echo "::error::Published release channel does not match the requested channel."
+            exit 1
+          fi
+
+          immutable="false"
+          for attempt in 1 2 3 4 5 6; do
+            immutable="$(gh release view "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isImmutable \
+              --jq '.isImmutable')"
+            if [ "$immutable" = "true" ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$immutable" = "true" ]; then
+            echo "Release is published and immutable."
+          else
+            echo "::warning::Release was published, but GitHub has not yet reported isImmutable=true."
+          fi
+
+          if ! gh release verify "$tag" --repo "$GITHUB_REPOSITORY"; then
+            echo "::warning::Release attestation verification is not available yet; the published release remains valid."
+          fi
+
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url'
+
+      - name: Clean up unfinished draft Release and tag
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          tag="${{ steps.release.outputs.tag }}"
+          if [ -z "$tag" ]; then
+            exit 0
+          fi
+
+          releases_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" 2>/dev/null)"
+          release_id="$(
+            jq -r --arg tag "$tag" \
+              '.[] | select(.tag_name == $tag) | .id' \
+              <<<"$releases_json" | head -n 1
+          )"
+          is_draft="$(
+            jq -r --arg tag "$tag" \
+              '.[] | select(.tag_name == $tag) | .draft' \
+              <<<"$releases_json" | head -n 1
+          )"
+
+          if [ -n "$release_id" ] && [ "$release_id" != "null" ] && [ "$is_draft" = "true" ]; then
+            echo "Deleting unfinished draft release and its tag: $tag"
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          elif [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Deleting orphan tag: $tag"
+            git push origin ":refs/tags/$tag"
+          else
+            echo "A published release exists for $tag; immutable published content will not be modified."
+          fi
