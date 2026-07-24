@@ -42,6 +42,41 @@ jobs:
           fetch-tags: true
           ref: ${{ github.sha }}
 
+      - name: Clean stale workflow draft releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          branch_slug="$(printf '%s' "$branch_name" \
+            | sed -E 's#[/[:space:]]+#-#g; s#[^A-Za-z0-9._-]+#-#g; s#-+#-#g; s#^-+##; s#-+$##')"
+
+          releases_json="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/releases" \
+            -f per_page=100)"
+
+          while IFS=$'\t' read -r release_id tag_name; do
+            if [ -z "$release_id" ] || [ -z "$tag_name" ]; then
+              continue
+            fi
+            echo "Removing stale workflow draft release: ${tag_name} (${release_id})"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+            git push origin ":refs/tags/${tag_name}" || true
+            git tag -d "$tag_name" || true
+          done < <(
+            jq -r --arg slug "$branch_slug" '
+              .[]
+              | select(.draft == true)
+              | select((.tag_name // "") | contains("-" + $slug + "-v1.0."))
+              | select((.body // "") | contains("发布方式：Draft Release"))
+              | [.id, .tag_name]
+              | @tsv
+            ' <<<"$releases_json"
+          )
+
+          git fetch --tags --prune --force
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -339,36 +374,42 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-          title="WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}"
-
-          args=(
-            "$tag"
-            --repo "$GITHUB_REPOSITORY"
-            --draft
-            --verify-tag
-            --target "${{ steps.release.outputs.release_commit }}"
-            --title "$title"
-            --notes-file "${RUNNER_TEMP}/release-notes.md"
-          )
+          prerelease="false"
           if [ "${{ steps.release.outputs.channel }}" != "stable" ]; then
-            args+=(--prerelease)
+            prerelease="true"
           fi
 
-          gh release create "${args[@]}"
+          payload_path="${RUNNER_TEMP}/draft-release.json"
+          response_path="${RUNNER_TEMP}/draft-release-response.json"
+          jq -n \
+            --arg tag "${{ steps.release.outputs.tag }}" \
+            --arg target "${{ steps.release.outputs.release_commit }}" \
+            --arg name "WangZheAccountManager ${{ steps.release.outputs.branch_slug }} v${{ steps.release.outputs.version }}" \
+            --arg body "$(cat "${RUNNER_TEMP}/release-notes.md")" \
+            --argjson prerelease "$prerelease" \
+            '{
+              tag_name: $tag,
+              target_commitish: $target,
+              name: $name,
+              body: $body,
+              draft: true,
+              prerelease: $prerelease
+            }' > "$payload_path"
 
-          releases_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")"
-          release_id="$(
-            jq -r --arg tag "$tag" \
-              '.[] | select(.tag_name == $tag and .draft == true) | .id' \
-              <<<"$releases_json" | head -n 1
-          )"
-          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
-            echo "::error::Draft release was created but its release ID could not be resolved."
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases" \
+            --input "$payload_path" > "$response_path"
+
+          release_id="$(jq -r '.id // empty' "$response_path")"
+          upload_url="$(jq -r '.upload_url // empty' "$response_path")"
+          if [ -z "$release_id" ] || [ -z "$upload_url" ]; then
+            echo "::error::GitHub did not return a valid Draft Release ID and upload URL."
+            cat "$response_path"
             exit 1
           fi
 
           echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "upload_url=$upload_url" >> "$GITHUB_OUTPUT"
           echo "Draft release ID: $release_id"
 
       - name: Upload assets to draft Release
@@ -377,12 +418,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release upload "${{ steps.release.outputs.tag }}" \
+          upload_url="${{ steps.draft.outputs.upload_url }}"
+          upload_base="${upload_url%%\{*}"
+
+          for file in \
             "${{ steps.assets.outputs.apk }}" \
             "${{ steps.assets.outputs.aab }}" \
             "${{ steps.assets.outputs.update }}" \
-            "${{ steps.assets.outputs.checksums }}" \
-            --repo "$GITHUB_REPOSITORY"
+            "${{ steps.assets.outputs.checksums }}"; do
+            name="$(basename "$file")"
+            echo "Uploading release asset: $name"
+            curl --fail-with-body --silent --show-error --location \
+              --request POST \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/octet-stream" \
+              --data-binary "@$file" \
+              "${upload_base}?name=${name}" > "${RUNNER_TEMP}/uploaded-${name}.json"
+          done
 
       - name: Verify all draft Release assets
         shell: bash
@@ -397,7 +451,9 @@ jobs:
             exit 1
           fi
 
-          assets_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100")"
+          assets_json="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets" \
+            -f per_page=100)"
           expected_files=(
             "${{ steps.assets.outputs.apk }}"
             "${{ steps.assets.outputs.aab }}"
@@ -447,17 +503,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-          if [ "${{ steps.release.outputs.channel }}" = "stable" ]; then
-            gh release edit "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --draft=false \
-              --latest
-          else
-            gh release edit "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --draft=false
+          prerelease="false"
+          make_latest="true"
+          if [ "${{ steps.release.outputs.channel }}" != "stable" ]; then
+            prerelease="true"
+            make_latest="false"
           fi
+
+          payload_path="${RUNNER_TEMP}/publish-release.json"
+          jq -n \
+            --argjson prerelease "$prerelease" \
+            --arg make_latest "$make_latest" \
+            '{
+              draft: false,
+              prerelease: $prerelease,
+              make_latest: $make_latest
+            }' > "$payload_path"
+
+          gh api --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${{ steps.draft.outputs.release_id }}" \
+            --input "$payload_path" > "${RUNNER_TEMP}/published-release.json"
 
       - name: Verify published immutable Release
         shell: bash
@@ -465,12 +530,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-          release_json="$(gh release view "$tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --json isDraft,isImmutable,isPrerelease,url,assets)"
+          release_id="${{ steps.draft.outputs.release_id }}"
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}")"
 
-          if [ "$(jq -r '.isDraft' <<<"$release_json")" != "false" ]; then
+          if [ "$(jq -r '.draft' <<<"$release_json")" != "false" ]; then
             echo "::error::Release is still a draft after the publish step."
             exit 1
           fi
@@ -480,17 +543,15 @@ jobs:
           fi
 
           expected_prerelease="${{ steps.release.outputs.channel != 'stable' }}"
-          if [ "$(jq -r '.isPrerelease' <<<"$release_json")" != "$expected_prerelease" ]; then
+          if [ "$(jq -r '.prerelease' <<<"$release_json")" != "$expected_prerelease" ]; then
             echo "::error::Published release channel does not match the requested channel."
             exit 1
           fi
 
           immutable="false"
-          for attempt in 1 2 3 4 5 6; do
-            immutable="$(gh release view "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json isImmutable \
-              --jq '.isImmutable')"
+          for attempt in $(seq 1 12); do
+            release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}")"
+            immutable="$(jq -r '.immutable // false' <<<"$release_json")"
             if [ "$immutable" = "true" ]; then
               break
             fi
@@ -500,14 +561,10 @@ jobs:
           if [ "$immutable" = "true" ]; then
             echo "Release is published and immutable."
           else
-            echo "::warning::Release was published, but GitHub has not yet reported isImmutable=true."
+            echo "::warning::Release was published, but GitHub has not yet reported immutable=true."
           fi
 
-          if ! gh release verify "$tag" --repo "$GITHUB_REPOSITORY"; then
-            echo "::warning::Release attestation verification is not available yet; the published release remains valid."
-          fi
-
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq '.url'
+          jq -r '.html_url' <<<"$release_json"
 
       - name: Clean up unfinished draft Release and tag
         if: failure()
@@ -517,28 +574,21 @@ jobs:
         run: |
           set +e
           tag="${{ steps.release.outputs.tag }}"
-          if [ -z "$tag" ]; then
-            exit 0
-          fi
+          release_id="${{ steps.draft.outputs.release_id }}"
 
-          releases_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" 2>/dev/null)"
-          release_id="$(
-            jq -r --arg tag "$tag" \
-              '.[] | select(.tag_name == $tag) | .id' \
-              <<<"$releases_json" | head -n 1
-          )"
-          is_draft="$(
-            jq -r --arg tag "$tag" \
-              '.[] | select(.tag_name == $tag) | .draft' \
-              <<<"$releases_json" | head -n 1
-          )"
-
-          if [ -n "$release_id" ] && [ "$release_id" != "null" ] && [ "$is_draft" = "true" ]; then
-            echo "Deleting unfinished draft release and its tag: $tag"
-            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          elif [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
-            echo "Deleting orphan tag: $tag"
-            git push origin ":refs/tags/$tag"
-          else
-            echo "A published release exists for $tag; immutable published content will not be modified."
+          if [ -n "$release_id" ]; then
+            release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" 2>/dev/null || true)"
+            if [ "$(jq -r '.draft // false' <<<"${release_json:-{}}")" = "true" ]; then
+              echo "Deleting unfinished draft release and its tag: $tag"
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+              git push origin ":refs/tags/$tag" || true
+            else
+              echo "A published release exists for $tag; immutable published content will not be modified."
+            fi
+          elif [ -n "$tag" ]; then
+            published_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" 2>/dev/null || true)"
+            if [ -z "$published_json" ]; then
+              echo "Deleting orphan tag: $tag"
+              git push origin ":refs/tags/$tag" || true
+            fi
           fi
