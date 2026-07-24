@@ -23,7 +23,6 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   width: 74px;
   min-width: 0;
   min-height: 40px;
@@ -50,7 +49,7 @@
   background: #315fca;
 }
 
-/* 首页使用一个连续的固定顶部栈：应用标题栏 + 路径/概览；只有列表区域滚动。 */
+/* 应用栏与主页概览组成连续固定顶部，只有列表区域滚动。 */
 .app-shell:has(.browser-view) .app-header {
   border-bottom-color: transparent;
   box-shadow: none;
@@ -77,10 +76,9 @@
 
 .browser-fixed-top {
   position: relative;
-  top: auto;
   z-index: 2;
   margin: 0;
-  padding: 10px 18px 10px;
+  padding: 10px 18px;
   background: rgba(255, 255, 255, 0.99);
   box-shadow: 0 12px 20px -20px rgba(24, 46, 85, 0.58);
 }
@@ -116,14 +114,30 @@
 }
 
 @media (max-width: 760px) {
+  /* 让品牌、备份、更新和统计直接参与同一个父级网格，杜绝嵌套容器换行。 */
   .app-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 5px;
+    align-items: center;
+    gap: 4px;
     padding: calc(6px + env(safe-area-inset-top)) 7px 6px;
   }
 
+  .app-header:not(:has(.update-launch)) {
+    grid-template-columns: minmax(0, 1fr) 76px 62px;
+  }
+
+  .app-header:has(.update-launch) {
+    grid-template-columns: minmax(0, 1fr) 68px 42px 62px;
+  }
+
+  .app-header-tools {
+    display: contents;
+  }
+
   .brand {
+    grid-column: 1;
+    grid-row: 1;
     gap: 6px;
+    min-width: 0;
     overflow: hidden;
   }
 
@@ -132,6 +146,10 @@
     height: 34px;
     border-radius: 10px;
     font-size: 19px;
+  }
+
+  .brand-copy {
+    min-width: 0;
   }
 
   .brand-copy strong {
@@ -143,53 +161,71 @@
     white-space: nowrap;
   }
 
-  .app-header-tools {
-    flex-wrap: nowrap;
-    gap: 4px;
+  .brand-copy small {
+    display: none;
   }
 
   .backup-launch {
-    width: 78px;
-    min-height: 38px;
-    padding-inline: 5px !important;
-    border-radius: 11px !important;
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-height: 36px;
+    padding-inline: 4px !important;
+    border-radius: 10px !important;
     font-size: 9px !important;
   }
 
   .update-launch {
-    width: 48px;
-    min-height: 38px;
-    padding-inline: 4px;
-    border-radius: 11px;
+    grid-column: 3;
+    grid-row: 1;
+    width: 100%;
+    min-height: 36px;
+    padding-inline: 3px;
+    border-radius: 10px;
     font-size: 9px;
   }
 
+  .app-header:not(:has(.update-launch)) .global-stats {
+    grid-column: 3;
+  }
+
+  .app-header:has(.update-launch) .global-stats {
+    grid-column: 4;
+  }
+
+  .app-header-tools .global-stats {
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
   .app-header-tools .global-stats span {
-    min-width: 32px;
-    padding: 4px 3px;
+    min-width: 0;
+    padding: 3px 2px;
   }
 
   .app-header-tools .global-stats b {
     font-size: 14px;
-    line-height: 1.1;
+    line-height: 1.05;
   }
 
   .app-header-tools .global-stats small {
     font-size: 9px;
-    line-height: 1.15;
+    line-height: 1.1;
   }
 
   .main-surface:has(> .browser-view) {
-    margin: 0 6px 6px;
-    border-radius: 0 0 18px 18px;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .browser-fixed-top {
-    padding: 7px 9px 8px;
+    padding: 6px 8px 7px;
   }
 
   .browser-fixed-top .breadcrumbs {
-    margin-bottom: 5px;
+    margin-bottom: 4px;
   }
 
   .browser-fixed-top .breadcrumb-button {
@@ -198,119 +234,87 @@
   }
 
   .browser-fixed-top .view-header {
-    grid-template-columns: minmax(0, 0.82fr) minmax(146px, 1.18fr);
-    gap: 8px;
-    padding: 11px 12px;
-    border-radius: 16px;
+    grid-template-columns: minmax(0, 0.82fr) minmax(142px, 1.18fr);
+    gap: 7px;
+    padding: 9px 10px;
+    border-radius: 15px;
   }
 
   .browser-fixed-top .view-header h2 {
-    font-size: clamp(25px, 7.4vw, 30px);
+    font-size: clamp(24px, 7vw, 29px);
   }
 
   .browser-fixed-top .eyebrow {
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     font-size: 8px;
   }
 
   .browser-fixed-top .summary-lines {
-    margin-top: 5px;
+    margin-top: 4px;
     gap: 0;
     font-size: 11px;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   .browser-fixed-top .header-actions {
-    gap: 5px;
+    gap: 4px;
   }
 
   .browser-fixed-top .header-actions .button {
-    min-height: 36px;
-    padding: 6px 4px;
-    border-radius: 10px;
-    font-size: 10px;
+    min-height: 32px;
+    padding: 5px 3px;
+    border-radius: 9px;
+    font-size: 9.5px;
   }
 
   .browser-scroll-region {
-    padding: 0 9px 10px;
+    padding: 0 8px 10px;
   }
 
   .browser-scroll-region .content-section {
-    margin-top: 12px;
+    margin-top: 11px;
   }
 }
 
-@media (max-width: 460px) {
-  .brand-copy strong {
-    font-size: 12px;
+@media (max-width: 380px) {
+  .app-header:not(:has(.update-launch)) {
+    grid-template-columns: minmax(0, 1fr) 68px 56px;
   }
 
-  .backup-launch {
-    width: 72px;
-    font-size: 8.5px !important;
-  }
-
-  .update-launch {
-    width: 44px;
-    gap: 2px;
-    font-size: 8.5px;
-  }
-
-  .app-header-tools .global-stats span {
-    min-width: 30px;
-    padding-inline: 2px;
-  }
-
-  .browser-fixed-top .view-header {
-    grid-template-columns: minmax(0, 0.78fr) minmax(142px, 1.22fr);
-    gap: 7px;
-    padding: 10px;
-  }
-
-  .browser-fixed-top .view-header h2 {
-    font-size: 26px;
-  }
-
-  .browser-fixed-top .header-actions .button {
-    min-height: 34px;
-    font-size: 9.5px;
-  }
-}
-
-@media (max-width: 350px) {
-  .app-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .app-header:has(.update-launch) {
+    grid-template-columns: minmax(0, 1fr) 62px 38px 56px;
   }
 
   .brand-mark {
-    width: 32px;
-    height: 32px;
+    width: 31px;
+    height: 31px;
+    font-size: 17px;
   }
 
   .brand-copy strong {
-    font-size: 11px;
+    font-size: 11.5px;
   }
 
-  .app-header-tools {
-    width: auto;
-    gap: 3px;
-  }
-
-  .backup-launch {
-    flex: 0 0 auto;
-    width: 66px;
-  }
-
+  .backup-launch,
   .update-launch {
-    width: 40px;
+    min-height: 34px;
+    font-size: 8px !important;
   }
 
-  .app-header-tools .global-stats span {
-    min-width: 28px;
+  .app-header-tools .global-stats b {
+    font-size: 13px;
+  }
+
+  .app-header-tools .global-stats small {
+    font-size: 8px;
   }
 
   .browser-fixed-top .view-header {
     grid-template-columns: minmax(0, 0.76fr) minmax(136px, 1.24fr);
-    padding: 9px;
+    padding: 8px;
+  }
+
+  .browser-fixed-top .view-header h2 {
+    font-size: 24px;
   }
 }
