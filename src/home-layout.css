@@ -1,16 +1,20 @@
 .app-header-tools {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: minmax(108px, 126px) auto;
   align-items: stretch;
-  justify-content: flex-end;
+  justify-content: end;
   gap: 8px;
   min-width: 0;
 }
 
+.app-header-tools > * {
+  min-width: 0;
+}
+
 .backup-launch {
-  order: 1;
-  flex: 0 0 auto;
-  width: clamp(108px, 11vw, 126px);
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
   min-width: 0 !important;
   padding-inline: 9px !important;
   text-align: center;
@@ -18,12 +22,13 @@
 }
 
 .update-launch {
-  order: 2;
+  grid-column: 2;
+  grid-row: 1;
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 74px;
+  gap: 5px;
+  width: 100%;
   min-width: 0;
   min-height: 40px;
   padding: 8px;
@@ -39,8 +44,21 @@
 }
 
 .app-header-tools .global-stats {
-  order: 3;
-  flex: 0 0 auto;
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+}
+
+html.capacitor-native .app-header-tools {
+  grid-template-columns: minmax(108px, 126px) 74px auto;
+}
+
+html.capacitor-native .app-header-tools .update-launch {
+  grid-column: 2;
+}
+
+html.capacitor-native .app-header-tools .global-stats {
+  grid-column: 3;
 }
 
 .update-launch.available {
@@ -49,7 +67,7 @@
   background: #315fca;
 }
 
-/* 应用栏与主页概览组成连续固定顶部，只有列表区域滚动。 */
+/* 首页形成连续固定顶部：应用标题栏 + 路径/概览；只有列表区域滚动。 */
 .app-shell:has(.browser-view) .app-header {
   border-bottom-color: transparent;
   box-shadow: none;
@@ -114,38 +132,26 @@
 }
 
 @media (max-width: 760px) {
-  /* 让品牌、备份、更新和统计直接参与同一个父级网格，杜绝嵌套容器换行。 */
   .app-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
     align-items: center;
-    gap: 4px;
-    padding: calc(6px + env(safe-area-inset-top)) 7px 6px;
-  }
-
-  .app-header:not(:has(.update-launch)) {
-    grid-template-columns: minmax(0, 1fr) 76px 62px;
-  }
-
-  .app-header:has(.update-launch) {
-    grid-template-columns: minmax(0, 1fr) 68px 42px 62px;
-  }
-
-  .app-header-tools {
-    display: contents;
+    gap: 8px;
+    min-height: 80px;
+    padding: calc(9px + env(safe-area-inset-top)) 10px 9px;
   }
 
   .brand {
-    grid-column: 1;
-    grid-row: 1;
-    gap: 6px;
     min-width: 0;
+    gap: 8px;
     overflow: hidden;
   }
 
   .brand-mark {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    font-size: 19px;
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    font-size: 24px;
   }
 
   .brand-copy {
@@ -155,7 +161,7 @@
   .brand-copy strong {
     max-width: none;
     overflow: hidden;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -165,53 +171,66 @@
     display: none;
   }
 
+  .app-header-tools {
+    display: grid !important;
+    grid-template-columns: 82px 76px;
+    align-items: stretch;
+    gap: 6px;
+    width: auto;
+    min-width: 0;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 78px 58px 76px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 58px;
+    height: 58px;
+  }
+
   .backup-launch {
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-    min-height: 36px;
-    padding-inline: 4px !important;
-    border-radius: 10px !important;
-    font-size: 9px !important;
+    grid-column: 1;
+    padding-inline: 5px !important;
+    border-radius: 14px !important;
+    font-size: 11px !important;
   }
 
   .update-launch {
-    grid-column: 3;
-    grid-row: 1;
-    width: 100%;
-    min-height: 36px;
-    padding-inline: 3px;
-    border-radius: 10px;
-    font-size: 9px;
-  }
-
-  .app-header:not(:has(.update-launch)) .global-stats {
-    grid-column: 3;
-  }
-
-  .app-header:has(.update-launch) .global-stats {
-    grid-column: 4;
+    grid-column: 2;
+    padding-inline: 4px;
+    border-radius: 14px;
+    font-size: 11px;
   }
 
   .app-header-tools .global-stats {
-    grid-row: 1;
-    width: 100%;
-    min-width: 0;
+    grid-column: 2;
+    display: flex;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+
+  html.capacitor-native .app-header-tools .global-stats {
+    grid-column: 3;
   }
 
   .app-header-tools .global-stats span {
     min-width: 0;
-    padding: 3px 2px;
+    width: 50%;
+    padding: 6px 3px;
+    place-content: center;
   }
 
   .app-header-tools .global-stats b {
-    font-size: 14px;
+    font-size: 17px;
     line-height: 1.05;
   }
 
   .app-header-tools .global-stats small {
-    font-size: 9px;
-    line-height: 1.1;
+    font-size: 10px;
+    line-height: 1.15;
   }
 
   .main-surface:has(> .browser-view) {
@@ -245,7 +264,7 @@
   }
 
   .browser-fixed-top .eyebrow {
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     font-size: 8px;
   }
 
@@ -253,68 +272,114 @@
     margin-top: 4px;
     gap: 0;
     font-size: 11px;
-    line-height: 1.2;
+    line-height: 1.22;
   }
 
   .browser-fixed-top .header-actions {
-    gap: 4px;
+    gap: 5px;
   }
 
   .browser-fixed-top .header-actions .button {
-    min-height: 32px;
-    padding: 5px 3px;
-    border-radius: 9px;
+    min-height: 34px;
+    padding: 5px 4px;
+    border-radius: 10px;
     font-size: 9.5px;
   }
 
   .browser-scroll-region {
-    padding: 0 8px 10px;
+    padding: 0 9px 10px;
   }
 
   .browser-scroll-region .content-section {
-    margin-top: 11px;
+    margin-top: 12px;
   }
 }
 
-@media (max-width: 380px) {
-  .app-header:not(:has(.update-launch)) {
-    grid-template-columns: minmax(0, 1fr) 68px 56px;
-  }
-
-  .app-header:has(.update-launch) {
-    grid-template-columns: minmax(0, 1fr) 62px 38px 56px;
+@media (max-width: 400px) {
+  .app-header {
+    gap: 7px;
+    padding-inline: 9px;
   }
 
   .brand-mark {
-    width: 31px;
-    height: 31px;
-    font-size: 17px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 22px;
   }
 
   .brand-copy strong {
-    font-size: 11.5px;
+    font-size: 14px;
+  }
+
+  .app-header-tools {
+    grid-template-columns: 74px 70px;
+    gap: 5px;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 70px 52px 68px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 54px;
+    height: 54px;
   }
 
   .backup-launch,
   .update-launch {
-    min-height: 34px;
-    font-size: 8px !important;
+    font-size: 10px !important;
   }
 
   .app-header-tools .global-stats b {
-    font-size: 13px;
+    font-size: 16px;
   }
 
   .app-header-tools .global-stats small {
-    font-size: 8px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 350px) {
+  .app-header {
+    gap: 6px;
+    padding-inline: 8px;
   }
 
-  .browser-fixed-top .view-header {
-    grid-template-columns: minmax(0, 0.76fr) minmax(136px, 1.24fr);
-    padding: 8px;
+  .brand {
+    gap: 6px;
   }
 
-  .browser-fixed-top .view-header h2 {
-    font-size: 24px;
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+  }
+
+  .brand-copy strong {
+    font-size: 13px;
+  }
+
+  .app-header-tools {
+    grid-template-columns: 68px 64px;
+    gap: 4px;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 66px 48px 64px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 50px;
+    height: 50px;
+  }
+
+  .backup-launch,
+  .update-launch {
+    font-size: 9px !important;
   }
 }
