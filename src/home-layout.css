@@ -1,0 +1,385 @@
+.app-header-tools {
+  display: grid;
+  grid-template-columns: minmax(108px, 126px) auto;
+  align-items: stretch;
+  justify-content: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-header-tools > * {
+  min-width: 0;
+}
+
+.backup-launch {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  min-width: 0 !important;
+  padding-inline: 9px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.update-launch {
+  grid-column: 2;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px;
+  border: 1px solid #dce3ed;
+  border-radius: 12px;
+  color: #31415d;
+  background: #f5f7fb;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.app-header-tools .global-stats {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+}
+
+html.capacitor-native .app-header-tools {
+  grid-template-columns: minmax(108px, 126px) 74px auto;
+}
+
+html.capacitor-native .app-header-tools .update-launch {
+  grid-column: 2;
+}
+
+html.capacitor-native .app-header-tools .global-stats {
+  grid-column: 3;
+}
+
+.update-launch.available {
+  color: #fff;
+  border-color: #315fca;
+  background: #315fca;
+}
+
+/* 首页形成连续固定顶部：应用标题栏 + 路径/概览；只有列表区域滚动。 */
+.app-shell:has(.browser-view) .app-header {
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
+.main-surface:has(> .browser-view) {
+  min-height: 0;
+  margin-top: 0;
+  padding: 0;
+  overflow: hidden;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: 0 18px 50px rgba(33, 51, 84, 0.1);
+}
+
+.browser-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.browser-fixed-top {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow: 0 12px 20px -20px rgba(24, 46, 85, 0.58);
+}
+
+.browser-fixed-top .breadcrumbs {
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.browser-fixed-top .view-header {
+  padding-block: 14px;
+}
+
+.browser-scroll-region {
+  min-width: 0;
+  min-height: 0;
+  padding: 0 18px 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.summary-lines {
+  display: grid;
+  gap: 1px;
+  margin-top: 7px;
+  line-height: 1.3;
+}
+
+.summary-lines span {
+  display: block;
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center;
+    gap: 8px;
+    min-height: 80px;
+    padding: calc(9px + env(safe-area-inset-top)) 10px 9px;
+  }
+
+  .brand {
+    min-width: 0;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .brand-mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    font-size: 24px;
+  }
+
+  .brand-copy {
+    min-width: 0;
+  }
+
+  .brand-copy strong {
+    max-width: none;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .brand-copy small {
+    display: none;
+  }
+
+  .app-header-tools {
+    display: grid !important;
+    grid-template-columns: 82px 76px;
+    align-items: stretch;
+    gap: 6px;
+    width: auto;
+    min-width: 0;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 78px 58px 76px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 58px;
+    height: 58px;
+  }
+
+  .backup-launch {
+    grid-column: 1;
+    padding-inline: 5px !important;
+    border-radius: 14px !important;
+    font-size: 11px !important;
+  }
+
+  .update-launch {
+    grid-column: 2;
+    padding-inline: 4px;
+    border-radius: 14px;
+    font-size: 11px;
+  }
+
+  .app-header-tools .global-stats {
+    grid-column: 2;
+    display: flex;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+
+  html.capacitor-native .app-header-tools .global-stats {
+    grid-column: 3;
+  }
+
+  .app-header-tools .global-stats span {
+    min-width: 0;
+    width: 50%;
+    padding: 6px 3px;
+    place-content: center;
+  }
+
+  .app-header-tools .global-stats b {
+    font-size: 17px;
+    line-height: 1.05;
+  }
+
+  .app-header-tools .global-stats small {
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .main-surface:has(> .browser-view) {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .browser-fixed-top {
+    padding: 6px 8px 7px;
+  }
+
+  .browser-fixed-top .breadcrumbs {
+    margin-bottom: 4px;
+  }
+
+  .browser-fixed-top .breadcrumb-button {
+    padding-block: 1px;
+    font-size: 12px;
+  }
+
+  .browser-fixed-top .view-header {
+    grid-template-columns: minmax(0, 0.82fr) minmax(142px, 1.18fr);
+    gap: 7px;
+    padding: 9px 10px;
+    border-radius: 15px;
+  }
+
+  .browser-fixed-top .view-header h2 {
+    font-size: clamp(24px, 7vw, 29px);
+  }
+
+  .browser-fixed-top .eyebrow {
+    margin-bottom: 3px;
+    font-size: 8px;
+  }
+
+  .browser-fixed-top .summary-lines {
+    margin-top: 4px;
+    gap: 0;
+    font-size: 11px;
+    line-height: 1.22;
+  }
+
+  .browser-fixed-top .header-actions {
+    gap: 5px;
+  }
+
+  .browser-fixed-top .header-actions .button {
+    min-height: 34px;
+    padding: 5px 4px;
+    border-radius: 10px;
+    font-size: 9.5px;
+  }
+
+  .browser-scroll-region {
+    padding: 0 9px 10px;
+  }
+
+  .browser-scroll-region .content-section {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .app-header {
+    gap: 7px;
+    padding-inline: 9px;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 22px;
+  }
+
+  .brand-copy strong {
+    font-size: 14px;
+  }
+
+  .app-header-tools {
+    grid-template-columns: 74px 70px;
+    gap: 5px;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 70px 52px 68px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 54px;
+    height: 54px;
+  }
+
+  .backup-launch,
+  .update-launch {
+    font-size: 10px !important;
+  }
+
+  .app-header-tools .global-stats b {
+    font-size: 16px;
+  }
+
+  .app-header-tools .global-stats small {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 350px) {
+  .app-header {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .brand {
+    gap: 6px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+  }
+
+  .brand-copy strong {
+    font-size: 13px;
+  }
+
+  .app-header-tools {
+    grid-template-columns: 68px 64px;
+    gap: 4px;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: 66px 48px 64px;
+  }
+
+  .backup-launch,
+  .update-launch,
+  .app-header-tools .global-stats {
+    min-height: 50px;
+    height: 50px;
+  }
+
+  .backup-launch,
+  .update-launch {
+    font-size: 9px !important;
+  }
+}

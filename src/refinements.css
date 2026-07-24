@@ -1,0 +1,153 @@
+.app-shell {
+  width: 100%;
+  max-width: none;
+}
+
+.main-surface {
+  margin: 10px;
+  padding: 20px 24px;
+}
+
+.breadcrumbs {
+  margin-bottom: 10px;
+  padding-bottom: 0;
+}
+
+.breadcrumb-button {
+  padding-block: 2px;
+}
+
+.view-header,
+.detail-hero {
+  padding-block: 18px;
+}
+
+.content-section {
+  margin-top: 22px;
+}
+
+.group-list {
+  gap: 8px;
+}
+
+.group-card {
+  padding-block: 13px;
+}
+
+.empty-state {
+  margin-top: 18px;
+  padding-block: 42px;
+}
+
+.server-list-grid {
+  row-gap: 7px;
+}
+
+.compact-server-card {
+  min-height: 100px !important;
+  padding-top: 11px !important;
+  padding-bottom: 9px !important;
+}
+
+.detail-grid {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.detail-card {
+  position: relative;
+  min-height: 126px;
+  padding: 16px 18px;
+}
+
+.detail-label {
+  margin-bottom: 8px;
+}
+
+.detail-card p {
+  margin-top: 6px;
+}
+
+.quick-edit-card {
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.quick-edit-card:hover {
+  border-color: #9fb4de;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(33, 51, 84, 0.12);
+}
+
+.quick-edit-card:active {
+  transform: translateY(0);
+}
+
+.quick-edit-card:focus-visible {
+  outline: 3px solid rgba(49, 95, 202, 0.24);
+  outline-offset: 2px;
+}
+
+.quick-edit-modal {
+  width: min(460px, 100%);
+}
+
+.quick-edit-value-preview {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  color: #66738a;
+  background: #f5f7fb;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .main-surface {
+    margin: 6px;
+    padding: 12px;
+  }
+
+  .breadcrumbs {
+    margin-bottom: 8px;
+  }
+
+  .view-header,
+  .detail-hero {
+    padding-block: 15px;
+  }
+
+  .content-section {
+    margin-top: 18px;
+  }
+
+  .group-card {
+    padding-block: 11px;
+  }
+
+  .empty-state {
+    margin-top: 14px;
+    padding-block: 34px;
+  }
+
+  .compact-server-card {
+    min-height: 96px !important;
+    padding-top: 10px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .detail-grid {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .detail-card {
+    min-height: 112px;
+    padding: 14px;
+  }
+}
