@@ -1,12 +1,15 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import {
+  createBackupSnapshot,
+  extractSnapshotRoot,
+  SNAPSHOT_SCHEMA_VERSION,
+} from '../domain/accountBackup.js'
 
 const CONFIG_KEY = 'wangzhe-account-backup-config:v1'
 const PAT_STORAGE_KEY = 'wangzhe-account-backup-pat:v1'
 const PAT_REMEMBER_KEY = 'wangzhe-account-backup-remember-pat:v1'
 const DATA_STORAGE_KEY = 'wangzhe-account-manager:v1'
-const SNAPSHOT_APP = 'wangzhe-account-manager'
-const SNAPSHOT_SCHEMA_VERSION = 1
 const DEFAULT_CONFIG = Object.freeze({
   owner: 'foxmaybeOI1761640545',
   repository: 'WangZheRongYao-1784465435',
@@ -263,32 +266,14 @@ function readCurrentRoot() {
 }
 
 function createSnapshot() {
-  return {
-    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-    app: SNAPSHOT_APP,
-    exportedAt: new Date().toISOString(),
-    stats: { ...props.stats },
-    data: readCurrentRoot(),
-  }
+  return createBackupSnapshot({
+    root: readCurrentRoot(),
+    stats: props.stats,
+  })
 }
 
 function snapshotJson() {
   return JSON.stringify(createSnapshot(), null, 2)
-}
-
-function extractSnapshotRoot(payload) {
-  if (!payload || typeof payload !== 'object') throw new Error('备份文件不是有效的 JSON 对象。')
-  if ('schemaVersion' in payload && payload.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
-    throw new Error(`不支持的备份版本：${payload.schemaVersion}。`)
-  }
-  if ('app' in payload && payload.app !== SNAPSHOT_APP) {
-    throw new Error('该文件不是王者多账号管理器备份。')
-  }
-  const root = payload.data ?? payload.root ?? payload
-  if (!root || root.type !== 'group' || !Array.isArray(root.children)) {
-    throw new Error('备份文件缺少有效的根分组数据。')
-  }
-  return root
 }
 
 function timestampName(date = new Date()) {
@@ -394,7 +379,7 @@ async function backupToGitHub() {
       <div class="backup-summary">
         <span><b>{{ stats.groups }}</b><small>分组</small></span>
         <span><b>{{ stats.servers }}</b><small>区服</small></span>
-        <span><b>JSON</b><small>备份格式</small></span>
+        <span><b>Schema {{ SNAPSHOT_SCHEMA_VERSION }}</b><small>备份格式</small></span>
       </div>
 
       <section class="backup-section">

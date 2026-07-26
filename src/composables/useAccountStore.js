@@ -4,6 +4,7 @@ import {
   nextCropType,
   normaliseCropType,
 } from '../domain/cropTypes.js'
+import { normaliseFarmSchedule } from '../domain/farmCalculator.js'
 
 export const ACCOUNT_STORAGE_KEY = 'wangzhe-account-manager:v1'
 
@@ -46,6 +47,10 @@ function toText(value) {
   return String(value ?? '').trim()
 }
 
+function cloneFarmSchedule(value) {
+  return value ? { ...value } : null
+}
+
 function normaliseSystem(value) {
   return SYSTEM_OPTIONS.some((item) => item.value === value) ? value : 'android'
 }
@@ -58,6 +63,7 @@ function hydrateNode(rawNode, parentId = null) {
   if (!rawNode || typeof rawNode !== 'object') return null
 
   if (rawNode.type === 'server') {
+    const cropType = normaliseCropType(rawNode.cropType)
     return {
       id: toText(rawNode.id) || createId('server'),
       type: 'server',
@@ -69,7 +75,8 @@ function hydrateNode(rawNode, parentId = null) {
       accountLevel: toLevel(rawNode.accountLevel),
       battlePassLevel: toLevel(rawNode.battlePassLevel),
       farmLevel: toLevel(rawNode.farmLevel),
-      cropType: normaliseCropType(rawNode.cropType),
+      cropType,
+      farmSchedule: normaliseFarmSchedule(rawNode.farmSchedule, cropType),
       epicSkins: toText(rawNode.epicSkins),
       createdAt: Number(rawNode.createdAt) || Date.now(),
     }
@@ -191,6 +198,7 @@ export function useAccountStore() {
       battlePassLevel: toLevel(payload.battlePassLevel),
       farmLevel: toLevel(payload.farmLevel),
       cropType: normaliseCropType(payload.cropType),
+      farmSchedule: null,
       epicSkins: toText(payload.epicSkins),
       createdAt: Date.now(),
     }
@@ -217,7 +225,11 @@ export function useAccountStore() {
     server.accountLevel = toLevel(payload.accountLevel)
     server.battlePassLevel = toLevel(payload.battlePassLevel)
     server.farmLevel = toLevel(payload.farmLevel)
-    server.cropType = normaliseCropType(payload.cropType)
+    const nextCrop = normaliseCropType(payload.cropType)
+    if (nextCrop !== server.cropType) {
+      server.cropType = nextCrop
+      server.farmSchedule = null
+    }
     server.epicSkins = toText(payload.epicSkins)
     return true
   }
@@ -225,7 +237,11 @@ export function useAccountStore() {
   function setServerCropType(id, cropType) {
     const server = getServer(id)
     if (!server) return null
-    server.cropType = normaliseCropType(cropType)
+    const nextCrop = normaliseCropType(cropType)
+    if (nextCrop !== server.cropType) {
+      server.cropType = nextCrop
+      server.farmSchedule = null
+    }
     return server.cropType
   }
 
@@ -233,6 +249,80 @@ export function useAccountStore() {
     const server = getServer(id)
     if (!server) return null
     return setServerCropType(id, nextCropType(server.cropType))
+  }
+
+  function setServersCropType(serverIds, cropType) {
+    const uniqueIds = [...new Set(
+      Array.isArray(serverIds)
+        ? serverIds.map((id) => toText(id)).filter(Boolean)
+        : [],
+    )]
+    const nextCrop = normaliseCropType(cropType)
+    const changes = []
+
+    uniqueIds.forEach((serverId) => {
+      const server = getServer(serverId)
+      if (!server || server.cropType === nextCrop) return
+      changes.push({
+        serverId,
+        previousCropType: server.cropType,
+        nextCropType: nextCrop,
+        previousFarmSchedule: cloneFarmSchedule(server.farmSchedule),
+      })
+      server.cropType = nextCrop
+      server.farmSchedule = null
+    })
+
+    return {
+      requestedCount: uniqueIds.length,
+      updatedCount: changes.length,
+      skippedCount: uniqueIds.length - changes.length,
+      cropType: nextCrop,
+      changes,
+    }
+  }
+
+  function restoreServersCropState(changes) {
+    if (!Array.isArray(changes)) return { restoredCount: 0, skippedCount: 0 }
+    const uniqueChanges = new Map()
+    changes.forEach((change) => {
+      const serverId = toText(change?.serverId)
+      if (serverId && !uniqueChanges.has(serverId)) uniqueChanges.set(serverId, change)
+    })
+
+    let restoredCount = 0
+    uniqueChanges.forEach((change, serverId) => {
+      const server = getServer(serverId)
+      if (!server) return
+      const previousCropType = normaliseCropType(change.previousCropType)
+      server.cropType = previousCropType
+      server.farmSchedule = normaliseFarmSchedule(
+        change.previousFarmSchedule,
+        previousCropType,
+      )
+      restoredCount += 1
+    })
+
+    return {
+      restoredCount,
+      skippedCount: uniqueChanges.size - restoredCount,
+    }
+  }
+
+  function setServerFarmSchedule(id, schedule) {
+    const server = getServer(id)
+    if (!server || !server.cropType) return null
+    const normalised = normaliseFarmSchedule(schedule, server.cropType)
+    if (!normalised) return null
+    server.farmSchedule = normalised
+    return cloneFarmSchedule(normalised)
+  }
+
+  function clearServerFarmSchedule(id) {
+    const server = getServer(id)
+    if (!server) return false
+    server.farmSchedule = null
+    return true
   }
 
   function getServersInGroup(groupId) {
@@ -338,6 +428,10 @@ export function useAccountStore() {
     updateServer,
     setServerCropType,
     cycleServerCropType,
+    setServersCropType,
+    restoreServersCropState,
+    setServerFarmSchedule,
+    clearServerFarmSchedule,
     getServersInGroup,
     deleteNode,
     moveChild,
