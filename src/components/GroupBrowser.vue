@@ -1,9 +1,15 @@
 <script setup>
 import { computed } from 'vue'
+import {
+  cropTypeToCode,
+  cropTypeToLabel,
+  nextCropType,
+} from '../domain/cropTypes.js'
 
 const props = defineProps({
   group: { type: Object, required: true },
   breadcrumbs: { type: Array, required: true },
+  recordableServerCount: { type: Number, default: 0 },
 })
 
 const emit = defineEmits([
@@ -14,14 +20,16 @@ const emit = defineEmits([
   'open-settings',
   'delete-group',
   'delete-server',
+  'cycle-server-crop',
+  'open-quick-recorder',
 ])
 
 const childGroups = computed(() => props.group.children.filter((item) => item.type === 'group'))
 const servers = computed(() => props.group.children.filter((item) => item.type === 'server'))
 const isEmpty = computed(() => props.group.children.length === 0)
 
-function cropCode(value) {
-  return ({ 8: '8', 16: '1', 32: '3' })[String(value)] ?? '8'
+function cropCycleLabel(server) {
+  return `${server.serverName}，当前为${cropTypeToLabel(server.cropType)}，点击切换为${cropTypeToLabel(nextCropType(server.cropType))}`
 }
 </script>
 
@@ -116,19 +124,29 @@ function cropCode(value) {
         </div>
       </section>
 
-      <section v-if="servers.length" class="content-section server-section">
+      <section v-if="servers.length || recordableServerCount" class="content-section server-section">
         <div class="section-heading">
           <div>
             <span class="section-kicker">Servers</span>
             <h3>区服账号</h3>
           </div>
-          <span class="count-badge">{{ servers.length }}</span>
+          <div class="section-heading-actions">
+            <button
+              v-if="recordableServerCount"
+              class="button secondary quick-record-launch"
+              type="button"
+              @click="emit('open-quick-recorder')"
+            >
+              快速记录
+            </button>
+            <span class="count-badge">{{ servers.length }}</span>
+          </div>
         </div>
 
-        <div class="server-grid server-list-grid">
+        <div v-if="servers.length" class="server-grid server-list-grid">
           <div v-for="server in servers" :key="server.id" class="server-card-shell compact-server-shell">
             <button
-              class="server-card compact-server-card"
+              class="server-card compact-server-card server-card-main"
               type="button"
               @click="emit('navigate-server', server.id)"
             >
@@ -140,14 +158,17 @@ function cropCode(value) {
                   <span class="server-status-diamond" aria-hidden="true"></span>
                   <span>农场等级 {{ server.farmLevel }}</span>
                 </span>
-                <span
-                  class="compact-crop-code"
-                  :aria-label="`${server.cropType} 小时作物`"
-                  :title="`${server.cropType} 小时作物`"
-                >
-                  {{ cropCode(server.cropType) }}
-                </span>
               </span>
+            </button>
+            <button
+              class="compact-crop-code crop-cycle-button"
+              :class="{ unrecorded: server.cropType === '' }"
+              type="button"
+              :aria-label="cropCycleLabel(server)"
+              :title="cropCycleLabel(server)"
+              @click.stop="emit('cycle-server-crop', server.id)"
+            >
+              {{ cropTypeToCode(server.cropType) }}
             </button>
             <button
               class="card-delete server-card-delete"

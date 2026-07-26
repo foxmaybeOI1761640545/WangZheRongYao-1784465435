@@ -1,14 +1,16 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import BackupCenter from './components/BackupCenter.vue'
 import GroupBrowser from './components/GroupBrowser.vue'
+import QuickCropRecorder from './components/QuickCropRecorder.vue'
 import ServerDetail from './components/ServerDetail.vue'
+import { CROP_OPTIONS } from './domain/cropTypes.js'
 import {
-  CROP_OPTIONS,
   PLATFORM_OPTIONS,
   SYSTEM_OPTIONS,
   useAccountStore,
 } from './composables/useAccountStore.js'
+import { registerNativeBackHandler } from './platform/nativeAppShell.js'
 
 const store = useAccountStore()
 const route = reactive({ type: 'group', id: 'root' })
@@ -17,6 +19,10 @@ const showGroupDialog = ref(false)
 const showServerDialog = ref(false)
 const showSettingsDialog = ref(false)
 const showBackupDialog = ref(false)
+const quickRecording = ref(false)
+const quickGroupId = ref('')
+let browserScrollPosition = 0
+let removeQuickBackHandler = null
 
 const groupForm = reactive({ name: '' })
 const settingsForm = reactive({ name: '' })
@@ -28,7 +34,7 @@ const serverForm = reactive({
   accountLevel: 0,
   battlePassLevel: 0,
   farmLevel: 0,
-  cropType: '8',
+  cropType: '',
   epicSkins: '',
 })
 
@@ -45,26 +51,76 @@ function syncRoute() {
 }
 
 function navigateGroup(id) {
+  quickRecording.value = false
+  quickGroupId.value = ''
   window.location.hash = `#/group/${encodeURIComponent(id)}`
 }
 
 function navigateServer(id) {
+  quickRecording.value = false
+  quickGroupId.value = ''
   window.location.hash = `#/server/${encodeURIComponent(id)}`
+}
+
+function handleEscape(event) {
+  if (event.key !== 'Escape' || !quickRecording.value) return
+  if (document.querySelector('.modal-backdrop')) return
+  event.preventDefault()
+  closeQuickRecorder()
 }
 
 onMounted(() => {
   window.addEventListener('hashchange', syncRoute)
+  window.addEventListener('keydown', handleEscape)
+  removeQuickBackHandler = registerNativeBackHandler(() => {
+    if (!quickRecording.value) return false
+    closeQuickRecorder()
+    return true
+  }, 100)
   if (!window.location.hash) navigateGroup('root')
   else syncRoute()
 })
 
-onBeforeUnmount(() => window.removeEventListener('hashchange', syncRoute))
+onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', syncRoute)
+  window.removeEventListener('keydown', handleEscape)
+  removeQuickBackHandler?.()
+})
 
 const currentGroup = computed(() => store.getGroup(route.id) ?? store.root.value)
 const currentServer = computed(() => store.getServer(route.id))
 const currentBreadcrumbs = computed(() => store.breadcrumbs(route.id))
+const currentGroupServerRecords = computed(() => store.getServersInGroup(currentGroup.value.id))
+const quickServerRecords = computed(() => (
+  store.getServersInGroup(quickGroupId.value || currentGroup.value.id)
+))
 const settingsGroups = computed(() => currentGroup.value.children.filter((item) => item.type === 'group'))
 const settingsServers = computed(() => currentGroup.value.children.filter((item) => item.type === 'server'))
+
+function openQuickRecorder() {
+  const scrollRegion = document.querySelector('.browser-scroll-region')
+  browserScrollPosition = scrollRegion instanceof HTMLElement ? scrollRegion.scrollTop : 0
+  quickGroupId.value = currentGroup.value.id
+  quickRecording.value = true
+}
+
+function closeQuickRecorder({ restoreScroll = true } = {}) {
+  const originGroupId = quickGroupId.value
+  quickRecording.value = false
+  quickGroupId.value = ''
+  if (!restoreScroll || route.type !== 'group' || route.id !== originGroupId) return
+
+  void nextTick(() => {
+    requestAnimationFrame(() => {
+      const scrollRegion = document.querySelector('.browser-scroll-region')
+      if (scrollRegion instanceof HTMLElement) scrollRegion.scrollTop = browserScrollPosition
+    })
+  })
+}
+
+function cycleServerCropType(serverId) {
+  store.cycleServerCropType(serverId)
+}
 
 watch(showSettingsDialog, (open) => {
   if (open) settingsForm.name = currentGroup.value.name
@@ -89,7 +145,7 @@ function resetServerForm() {
     accountLevel: 0,
     battlePassLevel: 0,
     farmLevel: 0,
-    cropType: '8',
+    cropType: '',
     epicSkins: '',
   })
 }
@@ -171,10 +227,19 @@ function deleteCurrentGroup() {
     </header>
 
     <main class="main-surface">
+      <QuickCropRecorder
+        v-if="quickRecording"
+        :group-name="currentGroup.name"
+        :records="quickServerRecords"
+        @cycle-server-crop="cycleServerCropType"
+        @done="closeQuickRecorder"
+      />
+
       <GroupBrowser
-        v-if="route.type === 'group'"
+        v-else-if="route.type === 'group'"
         :group="currentGroup"
         :breadcrumbs="currentBreadcrumbs"
+        :recordable-server-count="currentGroupServerRecords.length"
         @navigate-group="navigateGroup"
         @navigate-server="navigateServer"
         @add-group="openAddGroup"
@@ -182,6 +247,8 @@ function deleteCurrentGroup() {
         @open-settings="showSettingsDialog = true"
         @delete-group="deleteGroupById"
         @delete-server="deleteServerById"
+        @cycle-server-crop="cycleServerCropType"
+        @open-quick-recorder="openQuickRecorder"
       />
 
       <ServerDetail
@@ -267,7 +334,9 @@ function deleteCurrentGroup() {
         <label class="field">
           <span>当前作物类型</span>
           <select v-model="serverForm.cropType">
-            <option v-for="item in CROP_OPTIONS" :key="item" :value="item">{{ item }} 小时作物</option>
+            <option v-for="item in CROP_OPTIONS" :key="item.value || 'unrecorded'" :value="item.value">
+              {{ item.label }}
+            </option>
           </select>
         </label>
         <label class="field full">

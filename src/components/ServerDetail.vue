@@ -2,6 +2,10 @@
 import { computed, reactive, ref, watch } from 'vue'
 import {
   CROP_OPTIONS,
+  CROP_TYPES,
+  cropTypeToLabel,
+} from '../domain/cropTypes.js'
+import {
   PLATFORM_OPTIONS,
   SYSTEM_OPTIONS,
 } from '../composables/useAccountStore.js'
@@ -38,7 +42,7 @@ const QUICK_FIELDS = {
   cropType: {
     label: '当前种植作物类型',
     kind: 'crop',
-    description: '仅支持记录 8、16、32 小时作物。',
+    description: '可以设为未记录，或记录 8、16、32 小时作物。',
   },
   epicSkins: {
     label: '史诗级以上皮肤',
@@ -59,7 +63,7 @@ const form = reactive({
   accountLevel: 0,
   battlePassLevel: 0,
   farmLevel: 0,
-  cropType: '8',
+  cropType: '',
   epicSkins: '',
 })
 
@@ -143,7 +147,7 @@ function submitQuickEdit() {
     const parsed = Number.parseInt(quickValue.value, 10)
     payload[field] = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
   } else if (field === 'cropType') {
-    payload.cropType = CROP_OPTIONS.includes(String(quickValue.value))
+    payload.cropType = CROP_TYPES.includes(String(quickValue.value))
       ? String(quickValue.value)
       : props.server.cropType
   } else {
@@ -185,7 +189,7 @@ function quickCardKeydown(event, field) {
         <div class="tag-row large">
           <span class="tag">{{ systemLabel }}</span>
           <span class="tag accent">{{ platformLabel }}</span>
-          <span class="tag crop">{{ server.cropType }} 小时作物</span>
+          <span class="tag crop">{{ cropTypeToLabel(server.cropType) }}</span>
         </div>
       </div>
 
@@ -249,8 +253,8 @@ function quickCardKeydown(event, field) {
         <label class="field">
           <span>当前作物类型</span>
           <select v-model="form.cropType">
-            <option v-for="item in CROP_OPTIONS" :key="item" :value="item">
-              {{ item }} 小时作物
+            <option v-for="item in CROP_OPTIONS" :key="item.value || 'unrecorded'" :value="item.value">
+              {{ item.label }}
             </option>
           </select>
         </label>
@@ -336,8 +340,8 @@ function quickCardKeydown(event, field) {
           @keydown="quickCardKeydown($event, 'cropType')"
         >
           <span class="detail-label">当前种植</span>
-          <strong>{{ server.cropType }} 小时</strong>
-          <p>仅记录 8 / 16 / 32 小时作物</p>
+          <strong>{{ cropTypeToLabel(server.cropType) }}</strong>
+          <p>支持未记录及 8 / 16 / 32 小时作物</p>
         </article>
 
         <article
@@ -387,8 +391,8 @@ function quickCardKeydown(event, field) {
               inputmode="numeric"
             />
             <select v-else-if="quickMeta.kind === 'crop'" v-model="quickValue" autofocus>
-              <option v-for="item in CROP_OPTIONS" :key="item" :value="item">
-                {{ item }} 小时作物
+              <option v-for="item in CROP_OPTIONS" :key="item.value || 'unrecorded'" :value="item.value">
+                {{ item.label }}
               </option>
             </select>
             <textarea

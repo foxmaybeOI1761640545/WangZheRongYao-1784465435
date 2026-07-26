@@ -6,6 +6,7 @@ import './refinements.css'
 import './android.css'
 import './home-layout.css'
 import './mobile-header.css'
+import './quick-crop-recorder.css'
 import App from './App.vue'
 import UpdateLauncher from './components/UpdateLauncher.vue'
 import {
