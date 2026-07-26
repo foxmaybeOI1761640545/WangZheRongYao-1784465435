@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import BackupCenter from './components/BackupCenter.vue'
+import FarmTimeCalculator from './components/FarmTimeCalculator.vue'
 import GroupBrowser from './components/GroupBrowser.vue'
 import QuickCropRecorder from './components/QuickCropRecorder.vue'
 import ServerDetail from './components/ServerDetail.vue'
@@ -10,7 +11,11 @@ import {
   SYSTEM_OPTIONS,
   useAccountStore,
 } from './composables/useAccountStore.js'
-import { registerNativeBackHandler } from './platform/nativeAppShell.js'
+import {
+  cancelVisibleEditor,
+  closeVisibleOverlay,
+  registerNativeBackHandler,
+} from './platform/nativeAppShell.js'
 
 const store = useAccountStore()
 const route = reactive({ type: 'group', id: 'root' })
@@ -21,6 +26,9 @@ const showSettingsDialog = ref(false)
 const showBackupDialog = ref(false)
 const quickRecording = ref(false)
 const quickGroupId = ref('')
+const quickBatchMode = ref(false)
+const quickBatchResult = ref(null)
+const farmCalculatorServerId = ref('')
 let browserScrollPosition = 0
 let removeQuickBackHandler = null
 
@@ -51,28 +59,53 @@ function syncRoute() {
 }
 
 function navigateGroup(id) {
+  farmCalculatorServerId.value = ''
   quickRecording.value = false
   quickGroupId.value = ''
   window.location.hash = `#/group/${encodeURIComponent(id)}`
 }
 
 function navigateServer(id) {
+  farmCalculatorServerId.value = ''
   quickRecording.value = false
   quickGroupId.value = ''
   window.location.hash = `#/server/${encodeURIComponent(id)}`
 }
 
 function handleEscape(event) {
-  if (event.key !== 'Escape' || !quickRecording.value) return
-  if (document.querySelector('.modal-backdrop')) return
-  event.preventDefault()
-  closeQuickRecorder()
+  if (event.key !== 'Escape') return
+  if (closeVisibleOverlay()) {
+    event.preventDefault()
+    return
+  }
+  if (quickBatchMode.value) {
+    event.preventDefault()
+    quickBatchMode.value = false
+    return
+  }
+  if (quickRecording.value) {
+    event.preventDefault()
+    closeQuickRecorder()
+    return
+  }
+  if (cancelVisibleEditor()) {
+    event.preventDefault()
+    return
+  }
+  if (route.type === 'server' && window.history.length > 1) {
+    event.preventDefault()
+    window.history.back()
+  }
 }
 
 onMounted(() => {
   window.addEventListener('hashchange', syncRoute)
   window.addEventListener('keydown', handleEscape)
   removeQuickBackHandler = registerNativeBackHandler(() => {
+    if (quickBatchMode.value) {
+      quickBatchMode.value = false
+      return true
+    }
     if (!quickRecording.value) return false
     closeQuickRecorder()
     return true
@@ -94,6 +127,7 @@ const currentGroupServerRecords = computed(() => store.getServersInGroup(current
 const quickServerRecords = computed(() => (
   store.getServersInGroup(quickGroupId.value || currentGroup.value.id)
 ))
+const farmCalculatorServer = computed(() => store.getServer(farmCalculatorServerId.value))
 const settingsGroups = computed(() => currentGroup.value.children.filter((item) => item.type === 'group'))
 const settingsServers = computed(() => currentGroup.value.children.filter((item) => item.type === 'server'))
 
@@ -101,6 +135,8 @@ function openQuickRecorder() {
   const scrollRegion = document.querySelector('.browser-scroll-region')
   browserScrollPosition = scrollRegion instanceof HTMLElement ? scrollRegion.scrollTop : 0
   quickGroupId.value = currentGroup.value.id
+  quickBatchMode.value = false
+  quickBatchResult.value = null
   quickRecording.value = true
 }
 
@@ -108,6 +144,8 @@ function closeQuickRecorder({ restoreScroll = true } = {}) {
   const originGroupId = quickGroupId.value
   quickRecording.value = false
   quickGroupId.value = ''
+  quickBatchMode.value = false
+  quickBatchResult.value = null
   if (!restoreScroll || route.type !== 'group' || route.id !== originGroupId) return
 
   void nextTick(() => {
@@ -120,6 +158,34 @@ function closeQuickRecorder({ restoreScroll = true } = {}) {
 
 function cycleServerCropType(serverId) {
   store.cycleServerCropType(serverId)
+}
+
+function applyBatchCropType({ serverIds, cropType }) {
+  quickBatchResult.value = store.setServersCropType(serverIds, cropType)
+  quickBatchMode.value = false
+}
+
+function undoBatchCropType() {
+  if (!quickBatchResult.value) return
+  store.restoreServersCropState(quickBatchResult.value.changes)
+  quickBatchResult.value = null
+}
+
+function openFarmCalculator(serverId) {
+  const server = store.getServer(serverId)
+  if (!server?.cropType) return
+  farmCalculatorServerId.value = server.id
+}
+
+function closeFarmCalculator() {
+  farmCalculatorServerId.value = ''
+}
+
+function saveFarmSchedule(schedule) {
+  const serverId = farmCalculatorServerId.value
+  if (!serverId) return
+  const saved = store.setServerFarmSchedule(serverId, schedule)
+  if (saved) closeFarmCalculator()
 }
 
 watch(showSettingsDialog, (open) => {
@@ -231,7 +297,12 @@ function deleteCurrentGroup() {
         v-if="quickRecording"
         :group-name="currentGroup.name"
         :records="quickServerRecords"
+        :batch-mode="quickBatchMode"
+        :last-batch-result="quickBatchResult"
         @cycle-server-crop="cycleServerCropType"
+        @apply-batch="applyBatchCropType"
+        @undo-batch="undoBatchCropType"
+        @update:batch-mode="quickBatchMode = $event"
         @done="closeQuickRecorder"
       />
 
@@ -248,6 +319,7 @@ function deleteCurrentGroup() {
         @delete-group="deleteGroupById"
         @delete-server="deleteServerById"
         @cycle-server-crop="cycleServerCropType"
+        @open-farm-calculator="openFarmCalculator"
         @open-quick-recorder="openQuickRecorder"
       />
 
@@ -270,6 +342,13 @@ function deleteCurrentGroup() {
     v-if="showBackupDialog"
     :stats="store.stats.value"
     @close="showBackupDialog = false"
+  />
+
+  <FarmTimeCalculator
+    v-if="farmCalculatorServer"
+    :server="farmCalculatorServer"
+    @close="closeFarmCalculator"
+    @save="saveFarmSchedule"
   />
 
   <div v-if="showGroupDialog" class="modal-backdrop" @click.self="showGroupDialog = false">

@@ -34,7 +34,7 @@ function isVisible(element) {
 }
 
 /** 优先关闭最上层弹窗，复用页面已有关闭按钮，避免复制组件状态。 */
-function closeVisibleOverlay() {
+export function closeVisibleOverlay() {
   const overlays = [...document.querySelectorAll('.modal-backdrop')].filter(isVisible)
   const overlay = overlays.at(-1)
   if (!overlay) return false
@@ -50,7 +50,7 @@ function closeVisibleOverlay() {
 }
 
 /** 完整编辑表单不是弹窗；返回键先触发“取消”，再允许离开详情页。 */
-function cancelVisibleEditor() {
+export function cancelVisibleEditor() {
   const editor = document.querySelector('.editor-panel')
   if (!isVisible(editor)) return false
   const cancelButton = [...editor.querySelectorAll('button')]

@@ -7,6 +7,7 @@ import './android.css'
 import './home-layout.css'
 import './mobile-header.css'
 import './quick-crop-recorder.css'
+import './farm-workflow-phase2.css'
 import App from './App.vue'
 import UpdateLauncher from './components/UpdateLauncher.vue'
 import {

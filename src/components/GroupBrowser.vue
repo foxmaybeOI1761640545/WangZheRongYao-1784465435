@@ -1,10 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import {
   cropTypeToCode,
   cropTypeToLabel,
   nextCropType,
 } from '../domain/cropTypes.js'
+import { formatFarmTargetTime } from '../domain/farmCalculator.js'
 
 const props = defineProps({
   group: { type: Object, required: true },
@@ -21,15 +22,35 @@ const emit = defineEmits([
   'delete-group',
   'delete-server',
   'cycle-server-crop',
+  'open-farm-calculator',
   'open-quick-recorder',
 ])
 
+const cropPromptServerId = ref('')
 const childGroups = computed(() => props.group.children.filter((item) => item.type === 'group'))
 const servers = computed(() => props.group.children.filter((item) => item.type === 'server'))
 const isEmpty = computed(() => props.group.children.length === 0)
 
 function cropCycleLabel(server) {
   return `${server.serverName}，当前为${cropTypeToLabel(server.cropType)}，点击切换为${cropTypeToLabel(nextCropType(server.cropType))}`
+}
+
+function compactTargetTime(timestamp) {
+  return formatFarmTargetTime(timestamp).replace(/^今日\s+/, '')
+}
+
+function openFarmCalculator(server, event) {
+  if (server.cropType) {
+    cropPromptServerId.value = ''
+    emit('open-farm-calculator', server.id)
+    return
+  }
+
+  cropPromptServerId.value = server.id
+  void nextTick(() => {
+    const shell = event.currentTarget?.closest('.server-card-shell')
+    shell?.querySelector('.crop-cycle-button')?.focus()
+  })
 }
 </script>
 
@@ -159,6 +180,21 @@ function cropCycleLabel(server) {
                   <span>农场等级 {{ server.farmLevel }}</span>
                 </span>
               </span>
+            </button>
+            <button
+              class="compact-farm-time"
+              type="button"
+              :aria-label="server.cropType ? `计算或查看 ${server.serverName} 的农场时间` : `${server.serverName} 尚未设置作物，请先设置当前作物类型`"
+              @click.stop="openFarmCalculator(server, $event)"
+            >
+              <span v-if="cropPromptServerId === server.id && !server.cropType" class="farm-time-prompt">
+                请先设置当前作物类型
+              </span>
+              <template v-else-if="server.farmSchedule">
+                <span>浇水 {{ compactTargetTime(server.farmSchedule.nextWaterAt) }}</span>
+                <span>最快 {{ compactTargetTime(server.farmSchedule.fastestMatureAt) }}</span>
+              </template>
+              <span v-else>计算时间</span>
             </button>
             <button
               class="compact-crop-code crop-cycle-button"

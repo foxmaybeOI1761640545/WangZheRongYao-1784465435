@@ -1,0 +1,410 @@
+.compact-server-card {
+  min-height: 134px !important;
+  padding-bottom: 42px !important;
+}
+
+.compact-farm-time {
+  position: absolute;
+  z-index: 4;
+  right: 62px;
+  bottom: 7px;
+  left: 12px;
+  display: flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px 9px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(197, 220, 246, 0.24);
+  border-radius: 8px;
+  color: rgba(234, 244, 255, 0.92);
+  background: rgba(17, 48, 82, 0.34);
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.compact-farm-time:hover,
+.compact-farm-time:focus-visible {
+  border-color: rgba(214, 234, 255, 0.55);
+  background: rgba(20, 59, 99, 0.58);
+}
+
+.compact-farm-time span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-farm-time .farm-time-prompt {
+  color: #ffe5a8;
+  white-space: normal;
+}
+
+.quick-crop-secondary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.quick-crop-secondary-actions > .button {
+  width: auto;
+  min-height: 38px;
+  padding: 8px 13px;
+}
+
+.batch-undo-message {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #3d4c64;
+  font-size: 12px;
+  text-align: right;
+}
+
+.batch-undo-message > span {
+  overflow-wrap: anywhere;
+}
+
+.batch-undo-message .text-button {
+  flex: 0 0 auto;
+}
+
+.batch-crop-toolbar {
+  display: grid;
+  gap: 11px;
+  margin-bottom: 12px;
+  padding: 13px;
+  border: 1px solid #d5e0ef;
+  border-radius: 15px;
+  background: #f4f8fe;
+}
+
+.batch-selection-actions,
+.batch-crop-targets {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.batch-selection-actions {
+  justify-content: space-between;
+}
+
+.batch-crop-targets > span {
+  color: #57657b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.batch-crop-targets button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #c9d5e5;
+  border-radius: 10px;
+  color: #33445f;
+  background: #fff;
+  box-shadow: none;
+  font-weight: 900;
+}
+
+.batch-crop-targets button.active {
+  border-color: #315f9a;
+  color: #fff;
+  background: #315f9a;
+}
+
+.batch-apply-button {
+  width: 100%;
+  min-height: 44px;
+  white-space: normal;
+}
+
+.quick-crop-row.selectable {
+  grid-template-columns: 26px minmax(0, 1fr) 52px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.quick-crop-row.selectable.selected {
+  border-color: #7098c9;
+  background: #eaf2fd;
+  box-shadow: inset 4px 0 #3c6fae;
+}
+
+.batch-server-checkbox {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #315f9a;
+}
+
+.quick-crop-cycle.readonly {
+  cursor: default;
+  box-shadow: none;
+}
+
+.batch-confirm-modal {
+  width: min(520px, 100%);
+}
+
+.batch-confirm-modal > p {
+  color: #46536a;
+  line-height: 1.65;
+}
+
+.batch-confirm-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 18px 0;
+}
+
+.batch-confirm-summary div {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f3f7fd;
+}
+
+.batch-confirm-summary dt {
+  color: #718096;
+  font-size: 11px;
+}
+
+.batch-confirm-summary dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  color: #233b65;
+  font-weight: 800;
+}
+
+.batch-clear-warning {
+  padding: 11px 13px;
+  border-left: 4px solid #d59b2f;
+  border-radius: 10px;
+  color: #66501b !important;
+  background: #fff7df;
+}
+
+.farm-calculator-backdrop {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.farm-calculator-modal {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.farm-calculator-context {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 18px;
+  padding: 13px 15px;
+  border-radius: 13px;
+  color: #315074;
+  background: #eef4fc;
+}
+
+.farm-calculator-context span {
+  overflow-wrap: anywhere;
+  color: #69758a;
+  font-size: 12px;
+}
+
+.farm-calculator-form {
+  display: grid;
+  gap: 16px;
+}
+
+.farm-calculator-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #dbe4f1;
+  border-radius: 14px;
+}
+
+.farm-calculator-form legend {
+  padding: 0 6px;
+  color: #304b72;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.farm-time-input-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.farm-time-input-row label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.farm-time-input-row label > span {
+  grid-column: 2;
+  grid-row: 1;
+  color: #68758b;
+  font-size: 12px;
+}
+
+.farm-time-input-row input {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  scroll-margin-block: 90px 150px;
+}
+
+.farm-calculator-reference {
+  margin: 0;
+  color: #68758a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.farm-calculator-error {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  color: #8a2525;
+  background: #fff0f0;
+}
+
+.farm-calculator-result dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 15px;
+}
+
+.farm-calculator-result dl > div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dce5f1;
+  border-radius: 13px;
+  background: #f8faff;
+}
+
+.farm-calculator-result dt {
+  color: #6c788c;
+  font-size: 11px;
+}
+
+.farm-calculator-result dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  color: #233b65;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.farm-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.farm-result-actions .button {
+  width: auto;
+}
+
+@media (max-width: 760px) {
+  .compact-server-card {
+    min-height: 128px !important;
+    padding-bottom: 39px !important;
+  }
+
+  .compact-farm-time {
+    right: 58px;
+    bottom: 6px;
+    left: 10px;
+    min-height: 28px;
+    gap: 3px 6px;
+    padding: 3px 5px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 430px) {
+  .quick-crop-secondary-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quick-crop-secondary-actions > .button {
+    width: 100%;
+  }
+
+  .batch-undo-message {
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .quick-crop-row.selectable {
+    grid-template-columns: 24px minmax(0, 1fr) 48px;
+    gap: 7px;
+  }
+
+  .batch-confirm-summary,
+  .farm-calculator-result dl {
+    grid-template-columns: 1fr;
+  }
+
+  .farm-result-actions .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .batch-crop-toolbar {
+    padding: 10px;
+  }
+
+  .batch-crop-targets {
+    gap: 6px;
+  }
+
+  .batch-crop-targets button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+  }
+
+  .farm-calculator-backdrop {
+    align-items: end;
+    padding: 8px;
+  }
+
+  .farm-calculator-modal {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .farm-time-input-row {
+    gap: 8px;
+  }
+}
