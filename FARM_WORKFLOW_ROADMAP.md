@@ -40,7 +40,7 @@
 - 分支：`future/1785038335/FarmWorkflowPhase1`
 - 阶段：第一阶段——降低作物记录成本
 - 合并状态：未合并
-- 发布状态：本阶段不创建正式 Release
+- 发布状态：第一阶段功能已完成，正在进行 v1.0.11 Beta Pre-release 发布前验证
 
 ## 5. 当前技术栈
 
@@ -155,6 +155,8 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 创建自动化数据兼容测试。
 - [x] 修复基线 `package-lock.json` 与 `package.json` 不同步问题，使最终 `npm ci` 通过。
 - [x] 创建本路线文档与 `AGENTS.md`。
+- [x] 明确 Android 构建采用方案 B：CI 安装固定 Gradle，不提交 Gradle Wrapper。
+- [ ] 等待方案 B Android Debug PR 检查成功后合并并发布 v1.0.11 Beta Pre-release。
 
 ## 11. 尚未完成
 
@@ -229,6 +231,17 @@ CROP_TYPES = ['', '8', '16', '32']
 
 ## 13. 已执行命令和结果
 
+### Android 构建方案 B
+
+本项目有意不提交 `android/gradlew`、`android/gradlew.bat` 或 `android/gradle/wrapper/`。缺少 Gradle Wrapper 不是文件缺失或待修复问题。Android 构建统一由 GitHub Actions 安装并固定以下环境：
+
+- Node.js 22；
+- Temurin JDK 21；
+- Gradle 8.11.1；
+- `android-actions/setup-android@v3` 提供 Android SDK。
+
+Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构建执行 `gradle assembleRelease bundleRelease`。不得改用 `./gradlew`，也不得向仓库补交 Wrapper。Android 构建以 GitHub Actions 结果为权威结果。
+
 ### 修改前基线
 
 | 命令 | 结果 |
@@ -238,7 +251,7 @@ CROP_TYPES = ['', '8', '16', '32']
 | `npm run build` | 通过 |
 | `npm run build:android` | 通过 |
 | `npx cap sync android` | 通过 |
-| `cd android && ./gradlew assembleDebug` | 无法启动：指定 Tag 不包含 `android/gradlew` |
+| `cd android && ./gradlew assembleDebug` | 不适用：项目有意采用方案 B，不提交或使用 Wrapper；该历史尝试不是有效的项目构建命令 |
 
 ### 修改后
 
@@ -249,13 +262,13 @@ CROP_TYPES = ['', '8', '16', '32']
 | `npm run build` | 通过 |
 | `npm run build:android` | 通过 |
 | `npx cap sync android` | 通过；生成文件在验证后恢复，不纳入提交 |
-| `cd android && ./gradlew assembleDebug` | 仍被基线缺少 Gradle Wrapper 阻塞 |
+| 方案 B Android Debug CI | 待 `android-verify.yml` 为当前 PR Base 启用后，由 GitHub Actions 使用 Gradle 8.11.1 执行 `gradle assembleDebug` |
 | 360/390/430/1366px 页面自动化 | 通过，无横向溢出，作物按钮均至少 44×44 |
 | 普通与快速模式交互自动化 | 通过：即时保存、事件隔离、递归 15 个账号、Esc 退出 |
 
 ## 14. 已知但未解决的问题
 
-1. 指定 Tag 没有 `android/gradlew`、`android/gradlew.bat` 和 `android/gradle/wrapper/`，因此当前环境无法执行要求的 Wrapper Debug 构建。这是基线问题，不是第一阶段改动导致。
+1. 项目明确采用方案 B，因此仓库不会包含 Gradle Wrapper；Android Debug 和正式签名构建必须依赖 GitHub Actions 的固定 Gradle 8.11.1 与 JDK 21 环境。
 2. `npx cap sync android` 会格式化两个 Capacitor 生成文件并生成 `config.xml`；验证后已恢复，避免提交无关生成差异。
 3. CSS 由多个历史文件叠加，第一阶段仅新增末尾加载的专用样式，没有进行全站 CSS 重构。
 4. 本轮没有向真实备份分支写入用户数据；GitHub 备份组件和默认值未修改，构建通过，但真实数据写入仍应由用户在应用中用测试数据复核。
@@ -365,7 +378,8 @@ CROP_TYPES = ['', '8', '16', '32']
 - 不破坏 `AppUpdatePlugin.kt`、应用内更新入口及发布版本校验；
 - 不修改签名文件、Repository Secrets 或固定签名工作流；
 - 发布继续遵守 `docs/IMMUTABLE_RELEASE.md`；
-- 补齐 Gradle Wrapper 前先确认仓库既有发布方式，避免引入错误 Gradle 版本。
+- 不得新增 Gradle Wrapper；CI 中只使用固定 Gradle 8.11.1 和 JDK 21；
+- Android Debug 与签名发布构建以 GitHub Actions 结果为权威结果。
 
 ## 23. 不允许破坏的功能
 
@@ -389,7 +403,7 @@ CROP_TYPES = ['', '8', '16', '32']
 2. 检查当前分支与远程 PR，不要从 `main` 猜测状态；
 3. 执行 `git status -sb`，确认没有无关改动；
 4. 执行 `npm ci`、`npm test` 和 `npm run build`；
-5. 先解决或明确记录 Gradle Wrapper 基线问题；
+5. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
 6. 若开始第二阶段，只读参考 FarmCalculator 指定 Tag；
 7. 先抽取纯计算逻辑和测试，不复制 UI；
 8. 设计新增字段与 Schema Version 1 兼容策略；
