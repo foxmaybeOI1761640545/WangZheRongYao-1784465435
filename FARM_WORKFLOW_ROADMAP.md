@@ -788,7 +788,9 @@ Release API 复核结果：v1.0.13 为 `draft=false`、`prerelease=true`、
 | 360×500 无头 Chromium | 确认框完整可见；取消不改变数据并恢复焦点；确认后清理上一轮并打开计算器 |
 | Android 返回键/Esc | 确认框复用统一 overlay 优先关闭；结构测试与浏览器 Esc 检查通过 |
 | 本地 Android Debug | 未运行：当前环境只有 JDK 17 且未安装 `gradle` |
-| 方案 B Android Debug CI | Draft PR 推送后使用 Node 22、JDK 21、Gradle 8.11.1 验证 |
+| `Verify Account Manager` | 通过：[Run #30200586494](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30200586494) |
+| 方案 B Android Debug CI | 通过：[Run #30200618754](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30200618754)；Node 22、JDK 21、Gradle 8.11.1 全步骤成功 |
+| Debug APK Artifact | `app-debug.apk`，3,962,103 bytes；Artifact ZIP digest `aa0c3cb228226c20721180471273ef0cb7351e4086c8fbfcf2805a00e29a5643` |
 | Android 真机/模拟器通知 | 当前环境无设备，未实测 |
 
 实现提交：
@@ -804,5 +806,7 @@ Release API 复核结果：v1.0.13 为 `draft=false`、`prerelease=true`、
 
 Android 13/14 权限流程、前后台/锁屏/Doze/强制结束通知、声音振动、通知点击、重启恢复、
 覆盖安装和 Android 15 Private Space 仍必须真机验证。静态测试、无头 Chromium 和
-Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第四阶段 Draft PR
-不合并，不触发 Signed Release，不创建 v1.0.14；第五阶段战令 40 级提醒尚未实现。
+Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第四阶段
+[Draft PR #11](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/11)
+保持 Draft、不合并；Phase4 HEAD 只触发验证工作流，未触发 Signed Release，也未创建
+v1.0.14。第五阶段战令 40 级提醒尚未实现。
