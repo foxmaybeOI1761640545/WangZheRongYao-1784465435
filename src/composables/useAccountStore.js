@@ -389,6 +389,35 @@ export function useAccountStore() {
     return true
   }
 
+  function startNextFarmCycle(id) {
+    const server = getServer(id)
+    if (!server) {
+      return { success: false, serverId: toText(id), reason: 'server-not-found' }
+    }
+    if (!normaliseCropType(server.cropType)) {
+      return { success: false, serverId: server.id, reason: 'crop-unrecorded' }
+    }
+
+    const previousFarmSchedule = cloneFarmSchedule(server.farmSchedule)
+    const previousFarmReminders = cloneFarmReminders(server.farmReminders)
+    const notificationIds = previousFarmReminders
+      ? FARM_REMINDER_TYPES
+        .map((type) => Number(previousFarmReminders[type]?.notificationId))
+        .filter((notificationId) => Number.isInteger(notificationId))
+      : []
+
+    server.farmSchedule = null
+    server.farmReminders = null
+    return {
+      success: true,
+      serverId: server.id,
+      cropType: server.cropType,
+      previousFarmSchedule,
+      previousFarmReminders,
+      notificationIds,
+    }
+  }
+
   function setServerFarmReminderPreferences(id, {
     waterEnabled,
     harvestEnabled,
@@ -609,6 +638,7 @@ export function useAccountStore() {
     restoreServersCropState,
     setServerFarmSchedule,
     clearServerFarmSchedule,
+    startNextFarmCycle,
     setServerFarmReminderPreferences,
     clearServerFarmReminders,
     getFarmReminderPlans,

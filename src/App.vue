@@ -1,12 +1,17 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import BackupCenter from './components/BackupCenter.vue'
+import FarmCycleResetDialog from './components/FarmCycleResetDialog.vue'
 import FarmTimeCalculator from './components/FarmTimeCalculator.vue'
 import GroupBrowser from './components/GroupBrowser.vue'
 import QuickCropRecorder from './components/QuickCropRecorder.vue'
 import ServerDetail from './components/ServerDetail.vue'
 import { useFarmClock, refreshFarmClock } from './composables/useFarmClock.js'
 import { CROP_OPTIONS } from './domain/cropTypes.js'
+import {
+  readFarmActionView,
+  writeFarmActionView,
+} from './domain/farmActionView.js'
 import {
   buildFarmReminderPlans,
   formatFarmReminderCopyText,
@@ -49,6 +54,9 @@ const quickGroupId = ref('')
 const quickBatchMode = ref(false)
 const quickBatchResult = ref(null)
 const farmCalculatorServerId = ref('')
+const farmCycleResetServerId = ref('')
+const farmCycleResetBusy = ref(false)
+const farmActionView = ref(readFarmActionView())
 const reminderBusy = ref(false)
 const reminderNotice = ref('')
 const manualCopyText = ref('')
@@ -64,6 +72,7 @@ let removeQuickBackHandler = null
 let removeReminderActionListener = null
 let removeAppStateListener = null
 let notificationRequestAttempted = false
+let farmCycleResetTrigger = null
 
 const groupForm = reactive({ name: '' })
 const settingsForm = reactive({ name: '' })
@@ -111,6 +120,9 @@ function closeTransientUi() {
   showSettingsDialog.value = false
   showBackupDialog.value = false
   reminderPermissionDialog.value = ''
+  farmCycleResetServerId.value = ''
+  farmCycleResetBusy.value = false
+  farmCycleResetTrigger = null
   farmCalculatorServerId.value = ''
   quickBatchMode.value = false
   quickRecording.value = false
@@ -267,6 +279,7 @@ const quickServerRecords = computed(() => (
   store.getServersInGroup(quickGroupId.value || currentGroup.value.id)
 ))
 const farmCalculatorServer = computed(() => store.getServer(farmCalculatorServerId.value))
+const farmCycleResetServer = computed(() => store.getServer(farmCycleResetServerId.value))
 const settingsGroups = computed(() => currentGroup.value.children.filter((item) => item.type === 'group'))
 const settingsServers = computed(() => currentGroup.value.children.filter((item) => item.type === 'server'))
 
@@ -313,12 +326,87 @@ function undoBatchCropType() {
   void syncFarmReminders()
 }
 
-function openFarmCalculator(serverId) {
+function openFarmCalculator(serverId, { preserveNotice = false } = {}) {
   const server = store.getServer(serverId)
   if (!server?.cropType) return
-  reminderNotice.value = ''
+  if (!preserveNotice) reminderNotice.value = ''
   manualCopyText.value = ''
   farmCalculatorServerId.value = server.id
+}
+
+function updateFarmActionView(value) {
+  farmActionView.value = writeFarmActionView(value)
+}
+
+function openFarmCycleReset({ serverId, trigger }) {
+  const server = store.getServer(serverId)
+  if (!server?.cropType || !server.farmSchedule) return
+  farmCycleResetTrigger = trigger instanceof HTMLElement ? trigger : null
+  farmCycleResetServerId.value = server.id
+}
+
+function closeFarmCycleReset({ restoreFocus = true } = {}) {
+  const trigger = farmCycleResetTrigger
+  farmCycleResetServerId.value = ''
+  farmCycleResetTrigger = null
+  if (!restoreFocus || !(trigger instanceof HTMLElement)) return
+  void nextTick(() => {
+    if (trigger.isConnected) trigger.focus()
+  })
+}
+
+function handleFarmActionCommand(payload) {
+  if (payload?.command === 'reset-cycle') {
+    openFarmCycleReset(payload)
+    return
+  }
+  if (['recalculate', 'view-time', 'calculate'].includes(payload?.command)) {
+    openFarmCalculator(payload.serverId)
+  }
+}
+
+async function confirmStartNextFarmCycle() {
+  const serverId = farmCycleResetServerId.value
+  if (!serverId || farmCycleResetBusy.value) return
+  farmCycleResetBusy.value = true
+  try {
+    const result = store.startNextFarmCycle(serverId)
+    if (!result.success) {
+      reminderNotice.value = result.reason === 'crop-unrecorded'
+        ? '当前账号尚未记录作物，无法开始同作物下一轮。'
+        : '目标账号不存在，无法开始下一轮。'
+      closeFarmCycleReset()
+      return
+    }
+
+    webReminderMonitor.forgetServer(serverId)
+    let cancellationFailed = []
+    let synchronisationFailed = []
+    try {
+      const cancellation = await reminderCoordinator.cancelNotificationIds(
+        result.notificationIds,
+      )
+      cancellationFailed = cancellation.failed
+      const syncResult = await syncFarmReminders()
+      synchronisationFailed = syncResult.failed ?? []
+    } catch {
+      cancellationFailed = [{
+        message: '上一轮系统提醒清理失败；本地数据已重置，应用恢复前台时会再次校准。',
+      }]
+    }
+
+    closeFarmCycleReset({ restoreFocus: false })
+    openFarmCalculator(serverId, { preserveNotice: true })
+    if (cancellationFailed.length || synchronisationFailed.length) {
+      reminderNotice.value = cancellationFailed[0]?.message
+        ?? synchronisationFailed[0]?.message
+        ?? '上一轮系统提醒清理失败；本地数据已重置，应用恢复前台时会再次校准。'
+    } else {
+      reminderNotice.value = '上一轮时间和提醒已清除，请输入新一轮时间。'
+    }
+  } finally {
+    farmCycleResetBusy.value = false
+  }
 }
 
 function closeFarmCalculator() {
@@ -620,6 +708,8 @@ function deleteCurrentGroup() {
         :group="currentGroup"
         :breadcrumbs="currentBreadcrumbs"
         :recordable-server-count="currentGroupServerRecords.length"
+        :recursive-server-records="currentGroupServerRecords"
+        :action-view="farmActionView"
         :now-ms="nowMs"
         @navigate-group="navigateGroup"
         @navigate-server="navigateServer"
@@ -631,6 +721,8 @@ function deleteCurrentGroup() {
         @cycle-server-crop="cycleServerCropType"
         @open-farm-calculator="openFarmCalculator"
         @open-quick-recorder="openQuickRecorder"
+        @update-action-view="updateFarmActionView"
+        @farm-action-command="handleFarmActionCommand"
       />
 
       <ServerDetail
@@ -670,6 +762,14 @@ function deleteCurrentGroup() {
     @update-reminders="updateFarmReminders"
     @request-exact="requestExactReminderSetting"
     @copy="copyFarmTime"
+  />
+
+  <FarmCycleResetDialog
+    v-if="farmCycleResetServer"
+    :server="farmCycleResetServer"
+    :busy="farmCycleResetBusy"
+    @close="closeFarmCycleReset"
+    @confirm="confirmStartNextFarmCycle"
   />
 
   <div
