@@ -33,11 +33,24 @@ export function createWebFarmReminderMonitor({
     return notifiedCount
   }
 
+  function forgetServer(serverId) {
+    const prefix = `${String(serverId ?? '').trim()}:`
+    if (prefix === ':') return 0
+    let removedCount = 0
+    for (const key of seen) {
+      if (!key.startsWith(prefix)) continue
+      seen.delete(key)
+      removedCount += 1
+    }
+    return removedCount
+  }
+
   prime(startedAt)
 
   return {
     prime,
     check,
+    forgetServer,
     hasSeen: (plan) => seen.has(occurrenceKey(plan)),
   }
 }
