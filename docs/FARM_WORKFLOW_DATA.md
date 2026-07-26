@@ -74,3 +74,22 @@ pending/delivered 状态和平台错误属于运行时信息，不进入账号�
 - 降级到 v1.0.12 后重新导出，可能丢失提醒偏好和稳定通知 ID。
 - 降级前必须保留一份 Schema 3 JSON 备份；重新升级后再导入。
 - v1.0.11 还会丢失 `farmSchedule`，不要用旧版本覆盖唯一备份。
+
+## 第四阶段派生行动视图
+
+第四阶段不改变 Schema 3，也不修改 `farmSchedule` 或 `farmReminders` 的内部结构。
+以下信息全部在运行时由现有账号数据和共享 `nowMs` 派生，不进入账号树或备份：
+
+- 六种行动状态和优先级；
+- 稳定排序结果与临时 `originalIndex`；
+- 剩余时间、到期状态和固定阈值；
+- 行动摘要；
+- 收获确认框临时状态；
+- `wangzhe-account-manager:farm-action-view:v1` UI 查看偏好。
+
+备份创建使用稳定字段白名单，因此未知的行动/排序/权限运行时字段不会意外进入 JSON。
+无外层 Schema、Schema 1、2、3 的导入规则不变，PAT 仍不会进入备份。
+
+“已收获并重新种植”只执行一次 Store 原子更新：保留当前 `cropType` 和账号资料，清除
+上一轮 `farmSchedule` 与 `farmReminders`。旧通知 ID 只作为调用平台取消接口的瞬时
+返回值，不写入新的业务字段。

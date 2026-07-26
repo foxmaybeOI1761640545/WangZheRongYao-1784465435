@@ -26,24 +26,28 @@
 3. 点一下设置提醒；
 4. 到时间后进入游戏处理对应账号。
 
-第一、第二阶段均已发布；当前进入第三阶段，在稳定的 `farmSchedule` 与 Schema 2 基础上实现网页倒计时、浏览器通知和 Android 本地农场提醒，不提前实现第四阶段自动排序。
+第一、第二、第三阶段均已发布；当前进入第四阶段，在稳定的 `farmSchedule`、
+`farmReminders` 与 Schema 3 基础上实现行动优先队列和同作物新一轮种植，不提前实现
+第五阶段战令提醒。
 
 ## 3. 唯一开发基线
 
 - 仓库：`foxmaybeOI1761640545/WangZheRongYao-1784465435`
-- Release Tag：`20260726-160013-future-1784566876-AndroidApp-v1.0.12`
-- 基线提交：`402205201939727d4c1dc6c5e21eb32772b205eb`
-- Release：v1.0.12 Android Beta Pre-release，已发布且不可变；
-- 第二阶段的六个提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
-- 第三阶段基线分支来源：直接从上述 Tag 创建，不修改 Tag、`main` 或 Android 发布分支。
+- Release Tag：`20260726-173048-future-1784566876-AndroidApp-v1.0.13`
+- 基线提交：`e43f44cfd2f26f72ce2aa589caaadb1b4397af85`
+- Release：v1.0.13 Android Beta Pre-release，已发布且不可变；
+- 第三阶段的六个提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
+- 第四阶段基线分支直接从上述不可变 Tag 创建，不修改 Tag、`main` 或 Android 发布分支。
 
 ## 4. 当前开发分支
 
-- 分支：`future/1785054684/FarmWorkflowPhase3`
-- 阶段：第三阶段——网页倒计时与 Android 本地农场提醒
+- 分支：`future/1785064821/FarmWorkflowPhase4`
+- 阶段：第四阶段——行动优先队列与新一轮种植
 - 第一阶段状态：已通过 PR #8 进入 `future/1784566876/AndroidApp`，并发布 v1.0.11；
 - 第二阶段状态：PR #9 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
-- 发布状态：v1.0.12 Beta Pre-release 已成功发布且不可变；第三阶段仅创建 Draft PR，不发布 v1.0.13。
+- 第三阶段状态：PR #10 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
+- 发布状态：v1.0.13 Beta Pre-release 已成功发布且不可变；第四阶段仅创建 Draft PR，
+  不发布 v1.0.14。
 
 ## 5. 当前技术栈
 
@@ -66,16 +70,20 @@
 | `src/domain/farmCalculator.js` | 8/16/32 小时参数、成熟公式、schedule 校验、时间与时长格式化 |
 | `src/domain/accountBackup.js` | Schema 1/2/3 迁移、Schema 3 导出及非法 schedule/reminders 清理 |
 | `src/domain/farmReminders.js` | 提醒 Schema、稳定通知 ID、冲突修复、计划与倒计时纯函数 |
+| `src/domain/farmActions.js` | 第四阶段六级行动分类、稳定排序、摘要、文案和主要命令 |
+| `src/domain/farmActionView.js` | 独立 UI 查看偏好的规范化和本地保存 |
 | `src/composables/useAccountStore.js` | 数据水合、树操作、批量/撤销、schedule 与提醒偏好原子保存 |
 | `src/services/farmReminderCoordinator.js` | 期望计划与系统通知的幂等校准 |
 | `src/platform/farmReminderAdapter.js` | Capacitor 通知、权限、频道和浏览器通知的唯一平台层 |
 | `src/composables/useFarmClock.js` | 页面共享 30 秒时钟和可见性恢复刷新 |
 | `src/components/GroupBrowser.vue` | 普通主页、作物循环、农场时间入口、倒计时与紧凑结果展示 |
 | `src/components/FarmReminderSettings.vue` | 提醒开关、能力状态、复制和精确设置入口 |
+| `src/components/FarmActionQueue.vue` | 递归行动队列、状态摘要、卡片和模式切换 |
+| `src/components/FarmCycleResetDialog.vue` | 同作物新一轮确认与安全焦点 |
 | `src/components/QuickCropRecorder.vue` | 单账号快速记录、批量选择、目标确认和一次撤销入口 |
 | `src/components/FarmTimeCalculator.vue` | 单账号倒计时输入、结果预览和明确保存 |
 | `src/components/ServerDetail.vue` | 详情展示、单项编辑与完整资料编辑 |
-| `src/components/BackupCenter.vue` | Schema 1/2 导入、Schema 2 导出与 GitHub 备份 |
+| `src/components/BackupCenter.vue` | Schema 1/2/3 导入、Schema 3 导出与 GitHub 备份 |
 | `src/App.vue` | 路由、弹窗、快速记录模式生命周期、Esc 和 Android 返回键优先级 |
 | `src/platform/nativeAppShell.js` | Capacitor 原生返回键桥接与表单 Enter 导航 |
 | `src/quick-crop-recorder.css` | 普通主页作物按钮覆盖及快速记录响应式样式 |
@@ -85,8 +93,12 @@
 | `tests/farmReminders.test.js` | 提醒 ID、计划、隐私和倒计时测试 |
 | `tests/farmReminderCoordinator.test.js` | Fake Adapter 校准、权限、容错和幂等测试 |
 | `tests/reminderMigration.test.js` | Schema 1/2/3 提醒迁移测试 |
+| `tests/farmActions.test.js` | 六种状态、边界、稳定排序、递归范围和摘要测试 |
+| `tests/farmCycleReset.test.js` | Store 原子重置、通知取消和网页去重测试 |
+| `tests/farmActionView.test.js` | UI 偏好、备份边界、组件结构和响应式规则测试 |
 | `docs/FARM_WORKFLOW_DATA.md` | Schema 3 数据结构、备份兼容和降级说明 |
 | `docs/FARM_REMINDERS.md` | 提醒架构、权限、Manifest、限制和设备验证清单 |
+| `docs/FARM_ACTIONS.md` | 第四阶段行动模型、交互、数据边界和验证说明 |
 | `docs/ANDROID*.md` | Android 构建、更新与签名说明 |
 | `docs/IMMUTABLE_RELEASE.md` | Release Immutability 流程 |
 
@@ -210,12 +222,17 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 自动化测试、数据说明和提醒架构文档；
 - [ ] Android 真机/模拟器的权限、锁屏、Doze、点击和设备重启实测；
 - [x] Draft PR 的方案 B Debug CI 验证并产出 APK。
+- [x] 六个提交纯 fast-forward 到 AndroidApp，未产生 Merge Commit；
+- [x] 发布不可变的 v1.0.13 Android Beta Pre-release。
 
 ### 第四阶段
 
-- [ ] 按收获、浇水、成熟、生长、未计时、未记录排序；
-- [ ] 状态颜色和剩余时间；
-- [ ] “已收获并重新种植”操作。
+- [ ] 按收获、浇水、成熟、生长、未计时、未记录稳定排序；
+- [ ] 递归行动队列、状态摘要、颜色和无障碍文字；
+- [ ] 保留原顺序模式与独立 UI 偏好；
+- [ ] “已收获并重新种植”原子重置、通知清理和新计算衔接；
+- [ ] 自动化、响应式和方案 B Android Debug 验证；
+- [ ] Draft PR，保持未合并且不发布 v1.0.14。
 
 ### 第五阶段
 
@@ -452,14 +469,14 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 ## 24. 下一位 AI 的具体开始步骤
 
 1. 完整阅读本文件；
-2. 检查不可变 v1.0.12 Tag、当前第三阶段分支和远程 Draft PR，不要从 `main` 猜测状态；
+2. 检查不可变 v1.0.13 Tag、当前第四阶段分支和远程 Draft PR，不要从 `main` 猜测状态；
 3. 执行 `git status -sb`，确认没有无关改动；
 4. 执行 `npm ci`、`npm test`、`npm run build`、`npm run build:android` 和 `npm run sync:android`；
 5. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
-6. 第三阶段变更必须保持 `farmSchedule`、`farmReminders` 和系统 pending 通知一致；
-7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.13；
-8. 不修改 v1.0.12 Tag、`main` 或 `future/1784566876/AndroidApp`；
-9. 不提前实现全屏闹钟、第四阶段排序或第五阶段战令提醒；
+6. 第四阶段变更必须保持行动状态完全派生，且新一轮重置与系统通知一致；
+7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.14；
+8. 不修改 v1.0.13 Tag、`main` 或 `future/1784566876/AndroidApp`；
+9. 不提前实现自动游戏操作、Schema 4 或第五阶段战令提醒；
 10. 修改完成后更新本文件的测试、风险、PR 和提交记录。
 
 ## 25. 更新日志
@@ -716,8 +733,8 @@ Schema 1/2/3、Fake Adapter exact/inexact/denied/过期/容错/幂等，以及�
 - 开发分支：`future/1785054684/FarmWorkflowPhase3`
 - PR Base：`future/1784566876/AndroidApp`
 - Draft PR：[PR #10](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/10)
-- 合并：禁止
-- 发布：禁止，不创建 v1.0.13，不修改不可变 v1.0.12 Release/Tag
+- 合并：六个提交已通过纯 fast-forward 进入 AndroidApp，未产生 Merge Commit
+- 发布：已创建不可变的 v1.0.13 Android Beta Pre-release
 
 实现提交：
 
@@ -729,5 +746,63 @@ Schema 1/2/3、Fake Adapter exact/inexact/denied/过期/容错/幂等，以及�
 | `294e9ff` | 网页时钟、浏览器通知、设置 UI、响应式样式和弹层优先级 |
 | `fbc450c` | 第三阶段路线、数据兼容、Android 与提醒设计文档 |
 
-Release API 复核结果：最新 Release 仍为 2026-07-26 发布的不可变 v1.0.12 Beta
-Pre-release；没有创建 v1.0.13。PR 保持 Draft，未合并，未触发 Android Signed Release。
+Release API 复核结果：v1.0.13 为 `draft=false`、`prerelease=true`、
+`immutable=true`，四项资产完整；发布提交为
+`e43f44cfd2f26f72ce2aa589caaadb1b4397af85`。PR #10 因 Base 被纯 fast-forward
+到 Head 而由 GitHub 自动标记 merged/closed，但没有产生新 Merge Commit。
+
+## 39. 第四阶段实现决策
+
+1. 唯一基线是不可变 Tag
+   `20260726-173048-future-1784566876-AndroidApp-v1.0.13`，提交
+   `e43f44cfd2f26f72ce2aa589caaadb1b4397af85`。
+2. 六种状态只从 `cropType`、合法 schedule 和共享 `nowMs` 派生；不新增业务持久化
+   字段，不升级 Schema 3。
+3. 浇水窗口固定 30 分钟，成熟窗口固定 2 小时；重叠严格采用收获、浇水、即将成熟、
+   生长、未计时、未记录顺序。
+4. `analyseFarmActionRecords` 单次分类并生成摘要，再按 priority 和 originalIndex 排序；
+   不原地修改输入或账号树。
+5. 行动模式读取 `getServersInGroup` 递归范围并显示路径；原顺序模式保留子分组优先、
+   直属账号、真实顺序、删除和现有卡片操作。
+6. UI 偏好使用独立键 `wangzhe-account-manager:farm-action-view:v1`，默认 action，
+   不进入账号树或备份。
+7. `startNextFarmCycle` 原子保留 cropType 和账号资料，清除 schedule/reminders 并返回
+   旧通知 ID；不调用插件或 DOM。
+8. App 定向取消 pending/delivered，清除网页去重并打开新一轮计算；失败不回滚本地
+   重置，恢复前台时再次校准。
+9. 确认框复用现有 Esc/Android 返回桥接，默认焦点安全，目标始终保存 serverId。
+10. Android Manifest、插件、权限、频道、原生代码、Gradle 和发布工作流保持不变。
+
+详细规则见 `docs/FARM_ACTIONS.md`。
+
+## 40. 第四阶段验证、提交与风险记录
+
+| 命令/检查 | 当前结果 |
+| --- | --- |
+| `npm ci` | 本地通过，按 lockfile 安装 132 个包 |
+| `npm test` | 本地通过，80/80；原有 54 项提醒、迁移、Store 与计算测试全部回归通过 |
+| `npm run build` | 本地通过 |
+| `npm run build:android` | 本地通过 |
+| `npm run sync:android` | 本地通过；同步后生成性 Android 文件恢复基线，无原生差异 |
+| 360/390/430/1366 无头 Chromium | 无横向溢出，行动主按钮至少 44px，切换控件完整 |
+| 360×500 无头 Chromium | 确认框完整可见；取消不改变数据并恢复焦点；确认后清理上一轮并打开计算器 |
+| Android 返回键/Esc | 确认框复用统一 overlay 优先关闭；结构测试与浏览器 Esc 检查通过 |
+| 本地 Android Debug | 未运行：当前环境只有 JDK 17 且未安装 `gradle` |
+| 方案 B Android Debug CI | Draft PR 推送后使用 Node 22、JDK 21、Gradle 8.11.1 验证 |
+| Android 真机/模拟器通知 | 当前环境无设备，未实测 |
+
+实现提交：
+
+| 提交 | 内容 |
+| --- | --- |
+| `9a26fbd` | 六种行动状态、固定阈值、稳定排序与 UI 偏好 |
+| `1859f4e` | 递归行动队列、原顺序切换、摘要与响应式样式 |
+| `3d7169d` | 定向清理新一轮网页提醒去重状态 |
+| `89afa5d` | Store 原子重置、pending/delivered 清理、确认框和计算器衔接 |
+| `b83a78d` | 备份稳定字段白名单，排除行动运行时状态 |
+| `03d19ca` | 状态、排序、递归、新一轮、通知清理和 UI 契约测试 |
+
+Android 13/14 权限流程、前后台/锁屏/Doze/强制结束通知、声音振动、通知点击、重启恢复、
+覆盖安装和 Android 15 Private Space 仍必须真机验证。静态测试、无头 Chromium 和
+Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第四阶段 Draft PR
+不合并，不触发 Signed Release，不创建 v1.0.14；第五阶段战令 40 级提醒尚未实现。
