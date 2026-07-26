@@ -6,13 +6,15 @@
 - Vite 8.1.0
 - Capacitor Core / Android 7.6.7
 - Capacitor App 7.1.2
+- Capacitor Local Notifications 7.0.7
 - Android Gradle Plugin 8.7.2
 - Gradle 8.11.1
 - JDK 21
 - compileSdk / targetSdk 35
 - minSdk 23（Android 6.0）
 
-Android 只负责原生容器、系统栏、软键盘和构建签名。账号树、Hash 路由、编辑、导入导出与 GitHub 备份继续由 Vue 层维护，Web 与 Android 共用同一套业务代码。
+Android 负责原生容器、系统栏、软键盘、本地通知和构建签名。账号树、Hash 路由、
+编辑、提醒意图、导入导出与 GitHub 备份继续由 Vue 层维护，Web 与 Android 共用同一套业务代码。
 
 ## 固定标识
 
@@ -74,6 +76,16 @@ vite build --base ./
 5. 根页面无历史时不强制退出，降低误触退出风险。
 
 因此从区服详情按系统返回会回到原分组；弹窗打开时只关闭弹窗，不会直接离开页面。
+
+## 农场本地提醒
+
+第三阶段通过官方 `@capacitor/local-notifications` 插件安排浇水和收获通知。应用只显式
+声明 `SCHEDULE_EXACT_ALARM`，不使用受限的 `USE_EXACT_ALARM`；普通通知权限由插件
+Manifest 提供。首次启动不请求权限，只有用户主动开启提醒时才进入解释和请求流程。
+
+应用启动及恢复前台时会重新校准提醒。官方插件 Manifest 的开机 receiver 负责设备重启
+后的未来提醒恢复。频道、Manifest 合并项、隐私边界和设备未实测项详见
+[`FARM_REMINDERS.md`](FARM_REMINDERS.md)。
 
 ## 回车与软键盘
 

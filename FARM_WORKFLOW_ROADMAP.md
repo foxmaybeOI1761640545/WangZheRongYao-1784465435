@@ -26,22 +26,24 @@
 3. 点一下设置提醒；
 4. 到时间后进入游戏处理对应账号。
 
-第一阶段已经合并并发布；当前进入第二阶段，只实现批量作物调整、农场时间纯计算和结果保存，不提前引入倒计时、通知或闹钟。
+第一、第二阶段均已发布；当前进入第三阶段，在稳定的 `farmSchedule` 与 Schema 2 基础上实现网页倒计时、浏览器通知和 Android 本地农场提醒，不提前实现第四阶段自动排序。
 
 ## 3. 唯一开发基线
 
 - 仓库：`foxmaybeOI1761640545/WangZheRongYao-1784465435`
-- Release Tag：`20260726-130921-future-1784566876-AndroidApp-v1.0.11`
-- 基线提交：`329ea496804294569b232a75e2591b96826e631c`
-- Release：v1.0.11 Android Beta Pre-release，已发布且不可变；
-- 基线分支来源：直接从上述 Tag 创建，不修改 Tag、`main` 或原 Android 分支。
+- Release Tag：`20260726-160013-future-1784566876-AndroidApp-v1.0.12`
+- 基线提交：`402205201939727d4c1dc6c5e21eb32772b205eb`
+- Release：v1.0.12 Android Beta Pre-release，已发布且不可变；
+- 第二阶段的六个提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
+- 第三阶段基线分支来源：直接从上述 Tag 创建，不修改 Tag、`main` 或 Android 发布分支。
 
 ## 4. 当前开发分支
 
-- 分支：`future/1785045626/FarmWorkflowPhase2`
-- 阶段：第二阶段——批量作物调整与农场时间计算
-- 第一阶段状态：已通过 PR #8 合并到 `future/1784566876/AndroidApp`
-- 发布状态：v1.0.11 Beta Pre-release 已发布且不可变；第二阶段保持 Draft，不发布 v1.0.12
+- 分支：`future/1785054684/FarmWorkflowPhase3`
+- 阶段：第三阶段——网页倒计时与 Android 本地农场提醒
+- 第一阶段状态：已通过 PR #8 进入 `future/1784566876/AndroidApp`，并发布 v1.0.11；
+- 第二阶段状态：PR #9 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
+- 发布状态：v1.0.12 Beta Pre-release 已成功发布且不可变；第三阶段仅创建 Draft PR，不发布 v1.0.13。
 
 ## 5. 当前技术栈
 
@@ -49,6 +51,7 @@
 - Vite `8.1.0`；
 - Capacitor Core/Android/CLI `7.6.7`；
 - `@capacitor/app` `7.1.2`；
+- `@capacitor/local-notifications` `7.0.7`；
 - Android Java/Kotlin 混合壳层；
 - 浏览器 `localStorage` 本地持久化；
 - GitHub Contents API 数据备份；
@@ -61,9 +64,14 @@
 | --- | --- |
 | `src/domain/cropTypes.js` | 作物合法值、代码、标签、规范化和循环纯函数 |
 | `src/domain/farmCalculator.js` | 8/16/32 小时参数、成熟公式、schedule 校验、时间与时长格式化 |
-| `src/domain/accountBackup.js` | Schema 1/2 迁移、Schema 2 导出及非法 schedule 清理 |
-| `src/composables/useAccountStore.js` | 数据水合、树操作、即时持久化、批量作物、撤销与 schedule 原子保存 |
-| `src/components/GroupBrowser.vue` | 普通主页、作物循环、农场时间入口与紧凑结果展示 |
+| `src/domain/accountBackup.js` | Schema 1/2/3 迁移、Schema 3 导出及非法 schedule/reminders 清理 |
+| `src/domain/farmReminders.js` | 提醒 Schema、稳定通知 ID、冲突修复、计划与倒计时纯函数 |
+| `src/composables/useAccountStore.js` | 数据水合、树操作、批量/撤销、schedule 与提醒偏好原子保存 |
+| `src/services/farmReminderCoordinator.js` | 期望计划与系统通知的幂等校准 |
+| `src/platform/farmReminderAdapter.js` | Capacitor 通知、权限、频道和浏览器通知的唯一平台层 |
+| `src/composables/useFarmClock.js` | 页面共享 30 秒时钟和可见性恢复刷新 |
+| `src/components/GroupBrowser.vue` | 普通主页、作物循环、农场时间入口、倒计时与紧凑结果展示 |
+| `src/components/FarmReminderSettings.vue` | 提醒开关、能力状态、复制和精确设置入口 |
 | `src/components/QuickCropRecorder.vue` | 单账号快速记录、批量选择、目标确认和一次撤销入口 |
 | `src/components/FarmTimeCalculator.vue` | 单账号倒计时输入、结果预览和明确保存 |
 | `src/components/ServerDetail.vue` | 详情展示、单项编辑与完整资料编辑 |
@@ -74,14 +82,18 @@
 | `tests/cropTypes.test.js` | 作物模型、旧数据、即时持久化、原子更新和递归顺序测试 |
 | `tests/farmCalculator.test.js` | 公式、边界、秒级取整和格式化测试 |
 | `tests/accountStoreFarm.test.js` | 批量、撤销、作物变化清理和 schedule 原子方法测试 |
-| `tests/backupMigration.test.js` | Schema 1/2 导入导出迁移测试 |
-| `docs/FARM_WORKFLOW_DATA.md` | 第二阶段数据结构、备份兼容和降级说明 |
+| `tests/farmReminders.test.js` | 提醒 ID、计划、隐私和倒计时测试 |
+| `tests/farmReminderCoordinator.test.js` | Fake Adapter 校准、权限、容错和幂等测试 |
+| `tests/reminderMigration.test.js` | Schema 1/2/3 提醒迁移测试 |
+| `docs/FARM_WORKFLOW_DATA.md` | Schema 3 数据结构、备份兼容和降级说明 |
+| `docs/FARM_REMINDERS.md` | 提醒架构、权限、Manifest、限制和设备验证清单 |
 | `docs/ANDROID*.md` | Android 构建、更新与签名说明 |
 | `docs/IMMUTABLE_RELEASE.md` | Release Immutability 流程 |
 
 ## 7. 当前账号数据结构
 
-v1.0.11 基线账号保持 Schema Version 1；第二阶段在账号节点增加可选的 `farmSchedule`，备份升级为 Schema Version 2：
+v1.0.11 基线账号保持 Schema Version 1；第二阶段增加可选 `farmSchedule`；第三阶段
+增加可选 `farmReminders`，备份升级为 Schema Version 3：
 
 ```js
 {
@@ -97,12 +109,15 @@ v1.0.11 基线账号保持 Schema Version 1；第二阶段在账号节点增加�
   farmLevel: 0,
   cropType: '',
   farmSchedule: null,
+  farmReminders: null,
   epicSkins: '',
   createdAt: 0,
 }
 ```
 
-合法 `farmSchedule` 使用内部 `schemaVersion: 1`，保存计算输入快照、浇水时间、当前预计成熟时间、理论最快成熟时间和公式中间量，时间戳统一为 Unix 毫秒数。分组节点继续使用 `children` 保存子分组和账号。`id`、`parentId`、`createdAt` 与其他资料不会被主页或批量作物操作覆盖。
+合法 `farmSchedule` 使用内部 `schemaVersion: 1`。合法 `farmReminders` 也使用独立的
+`schemaVersion: 1`，只保存两个开关和两个稳定正 32 位通知 ID；目标时间继续从 schedule
+派生。分组节点继续使用 `children` 保存子分组和账号。
 
 ## 8. 作物值、代码与标签映射
 
@@ -188,9 +203,13 @@ CROP_TYPES = ['', '8', '16', '32']
 
 ### 第三阶段
 
-- [ ] 网页倒计时与浏览器通知；
-- [ ] Android 原生通知和闹钟；
-- [ ] 重启恢复、修改更新和删除清理提醒。
+- [x] 网页倒计时、网页通知和复制降级；
+- [x] Android Local Notifications、频道和 exact/inexact/denied 能力；
+- [x] 启动/前台恢复、重新计算、作物修改、批量撤销和删除校准；
+- [x] Schema 3 与稳定通知 ID 冲突修复；
+- [x] 自动化测试、数据说明和提醒架构文档；
+- [ ] Android 真机/模拟器的权限、锁屏、Doze、点击和设备重启实测；
+- [ ] Draft PR 的方案 B Debug CI 验证。
 
 ### 第四阶段
 
@@ -287,7 +306,8 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 ## 14. 已知但未解决的问题
 
 1. 项目明确采用方案 B，因此仓库不会包含 Gradle Wrapper；Android Debug 和正式签名构建必须依赖 GitHub Actions 的固定 Gradle 8.11.1 与 JDK 21 环境。
-2. `npx cap sync android` 会格式化两个 Capacitor 生成文件并生成 `config.xml`；验证后已恢复，避免提交无关生成差异。
+2. `npx cap sync android` 会格式化两个 Capacitor 生成文件并生成 `config.xml`；第三阶段只
+   保留 Local Notifications 模块映射与依赖，恢复注释/空行并删除无关生成文件。
 3. CSS 由多个历史文件叠加，第一阶段仅新增末尾加载的专用样式，没有进行全站 CSS 重构。
 4. 本轮没有向真实备份分支写入用户数据；GitHub 备份组件和默认值未修改，构建通过，但真实数据写入仍应由用户在应用中用测试数据复核。
 5. 临时 Chromium 的中文字体不可用，不影响 DOM 尺寸与交互断言；布局截图仅用于结构检查。
@@ -384,16 +404,17 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 
 ## 21. 数据迁移和备份兼容策略
 
-1. Schema Version 1 继续作为可导入的旧格式；
+1. Schema Version 1 和 2 继续作为可导入的旧格式；
 2. 水合层负责把缺失或非法 `cropType` 规范化为 `''`；
 3. 旧 `8/16/32` 字符串不转换含义；
 4. 导出允许 `cropType: ''`；
-5. 第二阶段导出升级为 Schema Version 2，并包含合法 `farmSchedule`；
-6. Schema 1 导入时自动补充 `farmSchedule: null`；Schema 2 导入会规范化并恢复合法 schedule；
+5. 第三阶段导出升级为 Schema Version 3，并包含合法 `farmSchedule` 和 `farmReminders`；
+6. Schema 1 补充空 schedule/reminders；Schema 2 恢复 schedule 并补充空 reminders；
+   Schema 3 恢复二者并在整棵树修复通知 ID；
 7. 导入始终先校验备份对象、应用名和根分组结构；
 8. PAT 与 GitHub 配置不进入数据快照；
 9. 不修改无关的备份仓库默认值。
-10. v1.0.11 重新导出数据可能丢失第二阶段字段，降级前必须保留 Schema 2 JSON。
+10. v1.0.12 重新导出会丢失提醒字段，降级前必须保留 Schema 3 JSON。
 
 ## 22. Android 注意事项
 
@@ -407,6 +428,10 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 - 发布继续遵守 `docs/IMMUTABLE_RELEASE.md`；
 - 不得新增 Gradle Wrapper；CI 中只使用固定 Gradle 8.11.1 和 JDK 21；
 - Android Debug 与签名发布构建以 GitHub Actions 结果为权威结果。
+- 精确提醒只声明 `SCHEDULE_EXACT_ALARM`，不得加入 `USE_EXACT_ALARM`；
+- 普通通知权限和开机恢复 receiver 由官方插件 Manifest 提供；
+- 首次启动不得请求通知或精确提醒权限；必须由用户明确操作触发；
+- 完整限制、频道与 Manifest 清单见 `docs/FARM_REMINDERS.md`。
 
 ## 23. 不允许破坏的功能
 
@@ -427,14 +452,14 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 ## 24. 下一位 AI 的具体开始步骤
 
 1. 完整阅读本文件；
-2. 检查 `future/1785045626/FarmWorkflowPhase2` 与远程 Draft PR，不要从 `main` 猜测状态；
+2. 检查不可变 v1.0.12 Tag、当前第三阶段分支和远程 Draft PR，不要从 `main` 猜测状态；
 3. 执行 `git status -sb`，确认没有无关改动；
 4. 执行 `npm ci`、`npm test`、`npm run build`、`npm run build:android` 和 `npm run sync:android`；
 5. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
-6. 若修复第二阶段，只围绕批量作物、farmSchedule、Schema 2 和快速计算，不扩展通知或排序；
-7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.12；
-8. 第三阶段必须在第二阶段另行验收、合并和发布后，从新的不可变基线开始；
-9. 不提前实现第三阶段闹钟、第四阶段排序或第五阶段战令提醒；
+6. 第三阶段变更必须保持 `farmSchedule`、`farmReminders` 和系统 pending 通知一致；
+7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.13；
+8. 不修改 v1.0.12 Tag、`main` 或 `future/1784566876/AndroidApp`；
+9. 不提前实现全屏闹钟、第四阶段排序或第五阶段战令提醒；
 10. 修改完成后更新本文件的测试、风险、PR 和提交记录。
 
 ## 25. 更新日志
@@ -537,23 +562,24 @@ Esc 与 Android 返回键顺序为：最上层确认/弹窗 → 计算面板 →
 
 ## 31. 第二阶段未实现与风险
 
-未实现且不得提前开始：Android AlarmManager、系统/浏览器通知、后台倒计时、每秒刷新、自动排序、红黄绿紧急状态、自动打开游戏和战令提醒。
+未实现且不得提前开始：全屏闹钟、自动拉起游戏、Service Worker 后台网页通知、每秒
+刷新、自动排序、红黄绿紧急状态和战令提醒。
 
 已知风险：
 
 1. 当前执行环境没有真实 Android 设备，软键盘和系统返回键以响应式浏览器自动化、单一监听代码路径和方案 B Debug CI 为验证依据；
 2. v1.0.11 重新导出会丢失第二阶段字段，降级前必须保存 Schema 2 JSON；
 3. 批量撤销只保留页面内最近一次操作，离开快速记录后不可撤销；
-4. 主页时间使用打开/重绘时的当前时间格式化，不引入实时倒计时；
-5. 第二阶段 Draft PR 不合并，因此不会触发 Android Signed Release 或创建 v1.0.12。
+4. 第三阶段用单一 30 秒共享时钟刷新倒计时，网页关闭后不保证通知；
+5. 第三阶段 Draft PR 不合并，因此不会触发 Android Signed Release 或创建 v1.0.13。
 
 ## 32. 第二阶段 PR 与提交
 
 - 开发分支：`future/1785045626/FarmWorkflowPhase2`
 - PR Base：`future/1784566876/AndroidApp`
 - Draft PR：[PR #9](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/9)
-- 合并：禁止，本阶段保持 Draft
-- 发布：禁止，不创建 v1.0.12
+- 合并：历史上已通过六个提交纯 fast-forward 进入 AndroidApp，没有 Merge Commit
+- 发布：已创建不可变 v1.0.12 Beta Pre-release
 
 完整实现提交：
 
@@ -583,3 +609,113 @@ Esc 与 Android 返回键顺序为：最上层确认/弹窗 → 计算面板 →
 - `tests/backupMigration.test.js`
 - `docs/FARM_WORKFLOW_DATA.md`
 - `FARM_WORKFLOW_ROADMAP.md`
+
+## 33. 第三阶段实现决策
+
+1. 唯一基线是不可变 Tag
+   `20260726-160013-future-1784566876-AndroidApp-v1.0.12`，提交
+   `402205201939727d4c1dc6c5e21eb32772b205eb`。
+2. 官方 `@capacitor/local-notifications` 固定为 `7.0.7`，只有
+   `src/platform/farmReminderAdapter.js` 导入插件。
+3. 使用 `SCHEDULE_EXACT_ALARM` 是因为 Android 12+ 的精确提醒需要用户可撤销的特殊
+   访问；不使用 `USE_EXACT_ALARM`，因为本应用并非系统闹钟或日历核心用途。
+4. 能力明确区分 `exact`、`inexact`、`denied` 与 `unsupported`。普通通知被拒绝时
+   取消系统 pending 提醒并保留用户偏好，不宣称设置成功。
+5. 固定频道为 `farm-water-reminders-v1` 和 `farm-harvest-reminders-v1`，private
+   锁屏可见性、声音和振动；小图标为白色矢量 `ic_stat_farm_reminder`。
+6. 通知 ID 从账号 ID 和 water/harvest 类型确定性分配，在整棵树内修复重复与非法
+   32 位 ID，保留合法未冲突 ID。
+7. 协调器对“数据期望计划”和系统 pending 通知做幂等差异同步。重新计算保留 ID 并
+   重排目标；作物变化、删除账号/分组时取消对应 pending 和 delivered 通知。
+8. 应用启动创建频道和校准，但不请求权限；恢复前台重新检查权限并校准。设备重启由
+   官方插件 Manifest 的 restore receiver 恢复未来提醒。
+9. 网页端使用单一 30 秒共享时钟；启动时先 prime 过期目标，避免刷新补发，只对页面
+   保持打开期间跨越到期点的计划通知一次。
+10. 通知负载只含账号定位和动作所需的最小字段，不含 PAT、GitHub 配置、皮肤、战令、
+    备份或签名信息。
+
+## 34. 第三阶段 Schema 3
+
+```js
+farmReminders: {
+  schemaVersion: 1,
+  water: {
+    enabled: true,
+    notificationId: 627617530,
+  },
+  harvest: {
+    enabled: true,
+    notificationId: 644395149,
+  },
+  updatedAt: 1800000000000,
+}
+```
+
+- Schema 1 导入后 schedule/reminders 均为空；
+- Schema 2 恢复合法 schedule，reminders 为空；
+- Schema 3 恢复合法 schedule/reminders，并全树修复 ID；
+- schedule 不存在、非法或与当前作物不匹配时 reminders 丢弃；
+- 目标时间不重复保存，而是读取 `nextWaterAt` 与 `fastestMatureAt`；
+- 权限、pending/delivered 和平台错误不持久化；
+- 导入函数不调用插件，成功替换数据后再由协调器校准；
+- 详细兼容和降级说明见 `docs/FARM_WORKFLOW_DATA.md`。
+
+## 35. 第三阶段 UI 与权限流程
+
+计算成功后可以选择浇水和收获提醒。新账号首次默认勾选二者；水已经到期时该项仍可
+展示但不会补发过期系统通知。用户可：
+
+- “保存并设置提醒”：保存 schedule 和提醒意图，再进入权限流程；
+- “仅保存时间”：已有提醒则保留偏好并随新目标更新，没有提醒则不新增；
+- 在已有日程的提醒设置区分别开关两类提醒；
+- 查看实时倒计时、明确时间和 exact/inexact/denied/web 状态；
+- 打开精确提醒设置，或复制浇水、收获和全部时间。
+
+首次启动不弹权限。用户明确开启提醒后先显示用途说明，Android 13+ 才请求普通通知
+权限；精确提醒另有独立说明和系统设置入口。拒绝后保留计算结果和页面倒计时。权限
+弹层优先于计算面板、批量模式、快速记录和编辑；仍复用单一 Android 返回监听。
+
+## 36. 第三阶段自动化与构建记录
+
+| 命令/检查 | 当前结果 |
+| --- | --- |
+| `npm test` | 本地通过，54/54 |
+| `npm run build` | 本地通过 |
+| `npm run build:android` | 本地通过 |
+| `npm run sync:android` | 本地通过；只保留插件模块映射和依赖 |
+| Android Manifest 静态输入 | 检查 SCHEDULE/无 USE、插件权限与三个 receiver |
+| 360/390/430/1366 与 360×500 无头 Chromium | 无横向溢出；44×44 作物按钮；提醒项 ≥59px；权限弹层 → 计算面板 Esc 优先级通过 |
+| 方案 B Android Debug CI | 待 Draft PR |
+| Android 真机/模拟器 | 当前环境无设备，未实测 |
+
+自动化覆盖通知 ID、冲突修复、计划内容和隐私、Store 作物/计算/批量/删除联动、
+Schema 1/2/3、Fake Adapter exact/inexact/denied/过期/容错/幂等，以及固定时钟网页
+通知去重。
+
+## 37. 第三阶段设备未实测项与风险
+
+当前环境没有 Android 模拟器或真机，因此以下项目明确未实测：
+
+- Android 13/14 首次授权、拒绝和再次操作；
+- 前台、后台、锁屏、Doze 和强制结束后的声音/振动通知；
+- 通知点击定位账号；
+- 关闭精确提醒权限后的系统实际清理行为；
+- 设备重启后的提醒恢复；
+- v1.0.12 覆盖安装 Debug APK 后 localStorage 保留。
+
+方案 B Debug CI 只能证明插件编译、Manifest 合并和 APK 产出，不能替代设备行为测试。
+此外，Doze/厂商省电可能延迟提醒；Android 15 Private Space 锁定期间通知也可能延迟，
+且应用无法可靠检测自己是否在 Private Space。网页标签关闭后不保证通知。回退方式是
+关闭系统提醒并继续使用页面倒计时、明确时间和复制功能；数据可用 Schema 3 JSON
+保留，降级到 v1.0.12 前必须先保存该备份。
+
+## 38. 第三阶段分支、提交和 Draft PR
+
+- 开发分支：`future/1785054684/FarmWorkflowPhase3`
+- PR Base：`future/1784566876/AndroidApp`
+- PR：待创建 Draft
+- 合并：禁止
+- 发布：禁止，不创建 v1.0.13，不修改不可变 v1.0.12 Release/Tag
+
+第三阶段提交 SHA、Draft PR 链接、Verify Android App 运行和最终测试数量将在推送及
+CI 完成后写入本节。
