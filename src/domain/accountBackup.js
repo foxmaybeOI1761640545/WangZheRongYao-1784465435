@@ -1,27 +1,56 @@
 import { normaliseCropType } from './cropTypes.js'
 import { normaliseFarmSchedule } from './farmCalculator.js'
+import { repairFarmReminderIdsInTree } from './farmReminders.js'
 
 export const SNAPSHOT_APP = 'wangzhe-account-manager'
-export const SNAPSHOT_SCHEMA_VERSION = 2
-export const SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS = Object.freeze([1, 2])
+export const SNAPSHOT_SCHEMA_VERSION = 3
+export const SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS = Object.freeze([1, 2, 3])
+
+function cloneReminderCandidate(value) {
+  if (!value || typeof value !== 'object') return null
+  return {
+    ...value,
+    water: value.water && typeof value.water === 'object' ? { ...value.water } : value.water,
+    harvest: value.harvest && typeof value.harvest === 'object' ? { ...value.harvest } : value.harvest,
+  }
+}
+
+function stableNodeFields(node) {
+  const {
+    pat,
+    token,
+    githubToken,
+    notificationPermission,
+    exactPermission,
+    pendingNotifications,
+    deliveredNotifications,
+    platformError,
+    ...stable
+  } = node
+  return stable
+}
 
 function cloneBackupNode(node, schemaVersion) {
   if (!node || typeof node !== 'object') return null
 
   if (node.type === 'server') {
     const cropType = normaliseCropType(node.cropType)
+    const farmSchedule = schemaVersion >= 2
+      ? normaliseFarmSchedule(node.farmSchedule, cropType)
+      : null
     return {
-      ...node,
+      ...stableNodeFields(node),
       cropType,
-      farmSchedule: schemaVersion >= 2
-        ? normaliseFarmSchedule(node.farmSchedule, cropType)
+      farmSchedule,
+      farmReminders: schemaVersion >= 3 && farmSchedule
+        ? cloneReminderCandidate(node.farmReminders)
         : null,
     }
   }
 
   if (node.type !== 'group' || !Array.isArray(node.children)) return null
   return {
-    ...node,
+    ...stableNodeFields(node),
     children: node.children
       .map((child) => cloneBackupNode(child, schemaVersion))
       .filter(Boolean),
@@ -33,7 +62,7 @@ export function normaliseBackupRoot(root, schemaVersion = SNAPSHOT_SCHEMA_VERSIO
   if (!normalised || normalised.type !== 'group') {
     throw new Error('备份文件缺少有效的根分组数据。')
   }
-  return normalised
+  return repairFarmReminderIdsInTree(normalised)
 }
 
 export function createBackupSnapshot({

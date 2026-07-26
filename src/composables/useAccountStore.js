@@ -5,6 +5,16 @@ import {
   normaliseCropType,
 } from '../domain/cropTypes.js'
 import { normaliseFarmSchedule } from '../domain/farmCalculator.js'
+import {
+  allocateFarmNotificationIds,
+  buildFarmReminderPlans,
+  cloneFarmReminders,
+  collectUsedNotificationIds,
+  FARM_REMINDER_SCHEMA_VERSION,
+  FARM_REMINDER_TYPES,
+  normaliseFarmReminders,
+  repairFarmReminderIdsInTree,
+} from '../domain/farmReminders.js'
 
 export const ACCOUNT_STORAGE_KEY = 'wangzhe-account-manager:v1'
 
@@ -51,6 +61,15 @@ function cloneFarmSchedule(value) {
   return value ? { ...value } : null
 }
 
+function cloneReminderCandidate(value) {
+  if (!value || typeof value !== 'object') return null
+  return {
+    ...value,
+    water: value.water && typeof value.water === 'object' ? { ...value.water } : value.water,
+    harvest: value.harvest && typeof value.harvest === 'object' ? { ...value.harvest } : value.harvest,
+  }
+}
+
 function normaliseSystem(value) {
   return SYSTEM_OPTIONS.some((item) => item.value === value) ? value : 'android'
 }
@@ -64,6 +83,7 @@ function hydrateNode(rawNode, parentId = null) {
 
   if (rawNode.type === 'server') {
     const cropType = normaliseCropType(rawNode.cropType)
+    const farmSchedule = normaliseFarmSchedule(rawNode.farmSchedule, cropType)
     return {
       id: toText(rawNode.id) || createId('server'),
       type: 'server',
@@ -76,7 +96,10 @@ function hydrateNode(rawNode, parentId = null) {
       battlePassLevel: toLevel(rawNode.battlePassLevel),
       farmLevel: toLevel(rawNode.farmLevel),
       cropType,
-      farmSchedule: normaliseFarmSchedule(rawNode.farmSchedule, cropType),
+      farmSchedule,
+      farmReminders: farmSchedule
+        ? cloneReminderCandidate(rawNode.farmReminders)
+        : null,
       epicSkins: toText(rawNode.epicSkins),
       createdAt: Number(rawNode.createdAt) || Date.now(),
     }
@@ -106,7 +129,7 @@ function loadTree() {
     const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY)
     if (!raw) return createRoot()
     const parsed = JSON.parse(raw)
-    return hydrateNode(parsed) ?? createRoot()
+    return repairFarmReminderIdsInTree(hydrateNode(parsed) ?? createRoot())
   } catch {
     return createRoot()
   }
@@ -160,6 +183,33 @@ export function useAccountStore() {
     return node?.type === 'server' ? node : null
   }
 
+  function normaliseServerReminderCandidate(server, candidate) {
+    const parsed = normaliseFarmReminders(candidate, server.farmSchedule)
+    if (!parsed) return null
+    const usedIds = collectUsedNotificationIds(state.root, {
+      excludeServerId: server.id,
+    })
+    const notificationIds = allocateFarmNotificationIds({
+      serverId: server.id,
+      existing: {
+        water: parsed.water.notificationId,
+        harvest: parsed.harvest.notificationId,
+      },
+      usedIds,
+    })
+    return {
+      ...parsed,
+      water: {
+        ...parsed.water,
+        notificationId: notificationIds.water,
+      },
+      harvest: {
+        ...parsed.harvest,
+        notificationId: notificationIds.harvest,
+      },
+    }
+  }
+
   function getParent(node) {
     return node?.parentId ? getGroup(node.parentId) : null
   }
@@ -199,6 +249,7 @@ export function useAccountStore() {
       farmLevel: toLevel(payload.farmLevel),
       cropType: normaliseCropType(payload.cropType),
       farmSchedule: null,
+      farmReminders: null,
       epicSkins: toText(payload.epicSkins),
       createdAt: Date.now(),
     }
@@ -229,6 +280,7 @@ export function useAccountStore() {
     if (nextCrop !== server.cropType) {
       server.cropType = nextCrop
       server.farmSchedule = null
+      server.farmReminders = null
     }
     server.epicSkins = toText(payload.epicSkins)
     return true
@@ -241,6 +293,7 @@ export function useAccountStore() {
     if (nextCrop !== server.cropType) {
       server.cropType = nextCrop
       server.farmSchedule = null
+      server.farmReminders = null
     }
     return server.cropType
   }
@@ -268,9 +321,11 @@ export function useAccountStore() {
         previousCropType: server.cropType,
         nextCropType: nextCrop,
         previousFarmSchedule: cloneFarmSchedule(server.farmSchedule),
+        previousFarmReminders: cloneFarmReminders(server.farmReminders),
       })
       server.cropType = nextCrop
       server.farmSchedule = null
+      server.farmReminders = null
     })
 
     return {
@@ -300,6 +355,10 @@ export function useAccountStore() {
         change.previousFarmSchedule,
         previousCropType,
       )
+      server.farmReminders = normaliseServerReminderCandidate(
+        server,
+        change.previousFarmReminders,
+      )
       restoredCount += 1
     })
 
@@ -315,6 +374,10 @@ export function useAccountStore() {
     const normalised = normaliseFarmSchedule(schedule, server.cropType)
     if (!normalised) return null
     server.farmSchedule = normalised
+    server.farmReminders = normaliseServerReminderCandidate(
+      server,
+      server.farmReminders,
+    )
     return cloneFarmSchedule(normalised)
   }
 
@@ -322,7 +385,91 @@ export function useAccountStore() {
     const server = getServer(id)
     if (!server) return false
     server.farmSchedule = null
+    server.farmReminders = null
     return true
+  }
+
+  function setServerFarmReminderPreferences(id, {
+    waterEnabled,
+    harvestEnabled,
+  }) {
+    const server = getServer(id)
+    const schedule = normaliseFarmSchedule(server?.farmSchedule, server?.cropType)
+    if (!server || !schedule) return null
+
+    const water = Boolean(waterEnabled)
+    const harvest = Boolean(harvestEnabled)
+    const previousFarmReminders = cloneFarmReminders(server.farmReminders)
+    if (!water && !harvest) {
+      server.farmReminders = null
+      return {
+        serverId: server.id,
+        previousFarmReminders,
+        farmReminders: null,
+        notificationIds: previousFarmReminders
+          ? FARM_REMINDER_TYPES.map((type) => previousFarmReminders[type].notificationId)
+          : [],
+      }
+    }
+
+    const usedIds = collectUsedNotificationIds(state.root, {
+      excludeServerId: server.id,
+    })
+    const notificationIds = allocateFarmNotificationIds({
+      serverId: server.id,
+      existing: {
+        water: server.farmReminders?.water?.notificationId,
+        harvest: server.farmReminders?.harvest?.notificationId,
+      },
+      usedIds,
+    })
+    const next = {
+      schemaVersion: FARM_REMINDER_SCHEMA_VERSION,
+      water: {
+        enabled: water,
+        notificationId: notificationIds.water,
+      },
+      harvest: {
+        enabled: harvest,
+        notificationId: notificationIds.harvest,
+      },
+      updatedAt: Date.now(),
+    }
+    server.farmReminders = normaliseFarmReminders(next, schedule)
+    return {
+      serverId: server.id,
+      previousFarmReminders,
+      farmReminders: cloneFarmReminders(server.farmReminders),
+      notificationIds: [notificationIds.water, notificationIds.harvest],
+    }
+  }
+
+  function clearServerFarmReminders(id) {
+    const server = getServer(id)
+    if (!server) return null
+    const previousFarmReminders = cloneFarmReminders(server.farmReminders)
+    server.farmReminders = null
+    return {
+      serverId: server.id,
+      previousFarmReminders,
+      notificationIds: previousFarmReminders
+        ? FARM_REMINDER_TYPES.map((type) => previousFarmReminders[type].notificationId)
+        : [],
+    }
+  }
+
+  function getAllServersWithReminders() {
+    return getServersInGroup('root')
+      .map(({ server }) => server)
+      .filter((server) => normaliseFarmReminders(
+        server.farmReminders,
+        server.farmSchedule,
+      ))
+  }
+
+  function getFarmReminderPlans(now = Date.now()) {
+    return getAllServersWithReminders()
+      .flatMap((server) => buildFarmReminderPlans(server, now))
   }
 
   function getServersInGroup(groupId) {
@@ -350,6 +497,31 @@ export function useAccountStore() {
     return result
   }
 
+  function collectDeletedReminderState(node) {
+    const serverIds = []
+    const notificationIds = []
+
+    function walk(current) {
+      if (current.type === 'server') {
+        serverIds.push(current.id)
+        const reminders = normaliseFarmReminders(
+          current.farmReminders,
+          current.farmSchedule,
+        )
+        if (reminders) {
+          FARM_REMINDER_TYPES.forEach((type) => {
+            notificationIds.push(reminders[type].notificationId)
+          })
+        }
+        return
+      }
+      if (current.type === 'group') current.children.forEach(walk)
+    }
+
+    walk(node)
+    return { serverIds, notificationIds }
+  }
+
   function deleteNode(id) {
     const node = findNode(id)
     if (!node || node.id === 'root') return false
@@ -358,8 +530,13 @@ export function useAccountStore() {
 
     const index = parent.children.findIndex((child) => child.id === id)
     if (index < 0) return false
+    const reminderState = collectDeletedReminderState(node)
     parent.children.splice(index, 1)
-    return true
+    return {
+      deleted: true,
+      nodeId: id,
+      ...reminderState,
+    }
   }
 
   function moveChild(parentId, childId, direction) {
@@ -432,6 +609,10 @@ export function useAccountStore() {
     restoreServersCropState,
     setServerFarmSchedule,
     clearServerFarmSchedule,
+    setServerFarmReminderPreferences,
+    clearServerFarmReminders,
+    getFarmReminderPlans,
+    getAllServersWithReminders,
     getServersInGroup,
     deleteNode,
     moveChild,

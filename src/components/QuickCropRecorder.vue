@@ -240,7 +240,7 @@ function confirmBatchApply() {
             <div><dt>目标作物</dt><dd>{{ cropTypeToLabel(pendingTarget) }}</dd></div>
             <div><dt>当前范围</dt><dd>{{ groupName }}</dd></div>
           </dl>
-          <p class="batch-clear-warning">修改作物后，对应账号原有的农场时间计算将被清除。</p>
+          <p class="batch-clear-warning">修改作物后，对应账号原有的农场时间和提醒设置将被清除。</p>
           <div class="modal-actions">
             <button class="button secondary" type="button" @click="pendingTarget = undefined">取消</button>
             <button class="button primary" type="button" @click="confirmBatchApply">确认批量调整</button>

@@ -96,7 +96,7 @@ test('Schema 2 导入恢复合法 schedule 并丢弃非法或作物不一致数�
   assert.equal(migrated.children[3].farmSchedule, null)
 })
 
-test('Schema 2 导出再导入完整保留计算结果且不包含 PAT', () => {
+test('Schema 3 导出再导入完整保留计算结果且不包含 PAT', () => {
   const snapshot = createBackupSnapshot({
     root: rootFixture(),
     stats: { groups: 0, servers: 4 },
@@ -113,7 +113,7 @@ test('Schema 2 导出再导入完整保留计算结果且不包含 PAT', () => {
 
 test('不支持的 Schema 和错误应用标识会明确拒绝', () => {
   assert.throws(
-    () => extractSnapshotRoot({ schemaVersion: 3, data: rootFixture() }),
+    () => extractSnapshotRoot({ schemaVersion: 4, data: rootFixture() }),
     /不支持的备份版本/,
   )
   assert.throws(
