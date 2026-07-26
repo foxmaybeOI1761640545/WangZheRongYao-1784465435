@@ -156,7 +156,8 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 修复基线 `package-lock.json` 与 `package.json` 不同步问题，使最终 `npm ci` 通过。
 - [x] 创建本路线文档与 `AGENTS.md`。
 - [x] 明确 Android 构建采用方案 B：CI 安装固定 Gradle，不提交 Gradle Wrapper。
-- [ ] 等待方案 B Android Debug PR 检查成功后合并并发布 v1.0.11 Beta Pre-release。
+- [x] 方案 B Android Debug PR 检查已成功并产出 `app-debug.apk`。
+- [ ] 合并并发布 v1.0.11 Beta Pre-release。
 
 ## 11. 尚未完成
 
@@ -262,7 +263,7 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 | `npm run build` | 通过 |
 | `npm run build:android` | 通过 |
 | `npx cap sync android` | 通过；生成文件在验证后恢复，不纳入提交 |
-| 方案 B Android Debug CI | 待 `android-verify.yml` 为当前 PR Base 启用后，由 GitHub Actions 使用 Gradle 8.11.1 执行 `gradle assembleDebug` |
+| 方案 B Android Debug CI | 通过：[Verify Android App #30188726613](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30188726613)，使用 Gradle 8.11.1 执行 `gradle assembleDebug`，并确认产出 `app-debug.apk` |
 | 360/390/430/1366px 页面自动化 | 通过，无横向溢出，作物按钮均至少 44×44 |
 | 普通与快速模式交互自动化 | 通过：即时保存、事件隔离、递归 15 个账号、Esc 退出 |
 
