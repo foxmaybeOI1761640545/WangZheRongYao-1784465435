@@ -209,7 +209,7 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] Schema 3 与稳定通知 ID 冲突修复；
 - [x] 自动化测试、数据说明和提醒架构文档；
 - [ ] Android 真机/模拟器的权限、锁屏、Doze、点击和设备重启实测；
-- [ ] Draft PR 的方案 B Debug CI 验证。
+- [x] Draft PR 的方案 B Debug CI 验证并产出 APK。
 
 ### 第四阶段
 
@@ -685,7 +685,9 @@ farmReminders: {
 | `npm run sync:android` | 本地通过；只保留插件模块映射和依赖 |
 | Android Manifest 静态输入 | 检查 SCHEDULE/无 USE、插件权限与三个 receiver |
 | 360/390/430/1366 与 360×500 无头 Chromium | 无横向溢出；44×44 作物按钮；提醒项 ≥59px；权限弹层 → 计算面板 Esc 优先级通过 |
-| 方案 B Android Debug CI | 待 Draft PR |
+| 方案 B Android Debug CI | 通过：[Verify Android App #30195662979](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30195662979)；所有步骤成功 |
+| Debug APK Artifact | `app-debug.apk`，3,956,956 bytes；Artifact SHA-256 digest `893658c6df10ef26b99a6e23a7485101747dc77829d9a90721d1e30189ef06e4` |
+| 最终 APK Manifest | 已从 Artifact 解析：包含 SCHEDULE、POST、BOOT、WAKE_LOCK 和三个插件 receiver；无 USE_EXACT_ALARM |
 | Android 真机/模拟器 | 当前环境无设备，未实测 |
 
 自动化覆盖通知 ID、冲突修复、计划内容和隐私、Store 作物/计算/批量/删除联动、
@@ -713,9 +715,19 @@ Schema 1/2/3、Fake Adapter exact/inexact/denied/过期/容错/幂等，以及�
 
 - 开发分支：`future/1785054684/FarmWorkflowPhase3`
 - PR Base：`future/1784566876/AndroidApp`
-- PR：待创建 Draft
+- Draft PR：[PR #10](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/10)
 - 合并：禁止
 - 发布：禁止，不创建 v1.0.13，不修改不可变 v1.0.12 Release/Tag
 
-第三阶段提交 SHA、Draft PR 链接、Verify Android App 运行和最终测试数量将在推送及
-CI 完成后写入本节。
+实现提交：
+
+| 提交 | 内容 |
+| --- | --- |
+| `738e28e` | 提醒领域模型、稳定 ID、计划、倒计时与隐私测试 |
+| `e25d53e` | Store 联动、Schema 3、迁移和批量/删除测试 |
+| `6dc2f12` | Local Notifications、Android 权限/频道、协调器与 Fake Adapter 测试 |
+| `294e9ff` | 网页时钟、浏览器通知、设置 UI、响应式样式和弹层优先级 |
+| `fbc450c` | 第三阶段路线、数据兼容、Android 与提醒设计文档 |
+
+Release API 复核结果：最新 Release 仍为 2026-07-26 发布的不可变 v1.0.12 Beta
+Pre-release；没有创建 v1.0.13。PR 保持 Draft，未合并，未触发 Android Signed Release。
