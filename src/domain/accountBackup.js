@@ -15,19 +15,31 @@ function cloneReminderCandidate(value) {
   }
 }
 
-function stableNodeFields(node) {
-  const {
-    pat,
-    token,
-    githubToken,
-    notificationPermission,
-    exactPermission,
-    pendingNotifications,
-    deliveredNotifications,
-    platformError,
-    ...stable
-  } = node
-  return stable
+function stableServerFields(node) {
+  return {
+    id: node.id,
+    type: 'server',
+    parentId: node.parentId,
+    serverName: node.serverName,
+    system: node.system,
+    platform: node.platform,
+    accountId: node.accountId,
+    accountLevel: node.accountLevel,
+    battlePassLevel: node.battlePassLevel,
+    farmLevel: node.farmLevel,
+    epicSkins: node.epicSkins,
+    createdAt: node.createdAt,
+  }
+}
+
+function stableGroupFields(node) {
+  return {
+    id: node.id,
+    type: 'group',
+    name: node.name,
+    parentId: node.parentId,
+    createdAt: node.createdAt,
+  }
 }
 
 function cloneBackupNode(node, schemaVersion) {
@@ -39,7 +51,7 @@ function cloneBackupNode(node, schemaVersion) {
       ? normaliseFarmSchedule(node.farmSchedule, cropType)
       : null
     return {
-      ...stableNodeFields(node),
+      ...stableServerFields(node),
       cropType,
       farmSchedule,
       farmReminders: schemaVersion >= 3 && farmSchedule
@@ -50,7 +62,7 @@ function cloneBackupNode(node, schemaVersion) {
 
   if (node.type !== 'group' || !Array.isArray(node.children)) return null
   return {
-    ...stableNodeFields(node),
+    ...stableGroupFields(node),
     children: node.children
       .map((child) => cloneBackupNode(child, schemaVersion))
       .filter(Boolean),
