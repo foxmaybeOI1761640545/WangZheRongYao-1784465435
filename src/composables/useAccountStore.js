@@ -1,6 +1,11 @@
 import { computed, reactive, watch } from 'vue'
+import {
+  CROP_TYPES,
+  nextCropType,
+  normaliseCropType,
+} from '../domain/cropTypes.js'
 
-const STORAGE_KEY = 'wangzhe-account-manager:v1'
+export const ACCOUNT_STORAGE_KEY = 'wangzhe-account-manager:v1'
 
 export const SYSTEM_OPTIONS = [
   { value: 'android', label: '安卓' },
@@ -12,7 +17,7 @@ export const PLATFORM_OPTIONS = [
   { value: 'wechat', label: '微信' },
 ]
 
-export const CROP_OPTIONS = ['8', '16', '32']
+export const CROP_OPTIONS = CROP_TYPES
 
 function createRoot() {
   return {
@@ -49,11 +54,6 @@ function normalisePlatform(value) {
   return PLATFORM_OPTIONS.some((item) => item.value === value) ? value : 'qq'
 }
 
-function normaliseCrop(value) {
-  const text = String(value ?? '')
-  return CROP_OPTIONS.includes(text) ? text : '8'
-}
-
 function hydrateNode(rawNode, parentId = null) {
   if (!rawNode || typeof rawNode !== 'object') return null
 
@@ -69,7 +69,7 @@ function hydrateNode(rawNode, parentId = null) {
       accountLevel: toLevel(rawNode.accountLevel),
       battlePassLevel: toLevel(rawNode.battlePassLevel),
       farmLevel: toLevel(rawNode.farmLevel),
-      cropType: normaliseCrop(rawNode.cropType),
+      cropType: normaliseCropType(rawNode.cropType),
       epicSkins: toText(rawNode.epicSkins),
       createdAt: Number(rawNode.createdAt) || Date.now(),
     }
@@ -96,7 +96,7 @@ function hydrateNode(rawNode, parentId = null) {
 
 function loadTree() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY)
     if (!raw) return createRoot()
     const parsed = JSON.parse(raw)
     return hydrateNode(parsed) ?? createRoot()
@@ -112,12 +112,12 @@ export function useAccountStore() {
     () => state.root,
     (value) => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+        localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(value))
       } catch {
         // Storage failures do not block the current session.
       }
     },
-    { deep: true },
+    { deep: true, flush: 'sync' },
   )
 
   function findNode(id, node = state.root) {
@@ -190,7 +190,7 @@ export function useAccountStore() {
       accountLevel: toLevel(payload.accountLevel),
       battlePassLevel: toLevel(payload.battlePassLevel),
       farmLevel: toLevel(payload.farmLevel),
-      cropType: normaliseCrop(payload.cropType),
+      cropType: normaliseCropType(payload.cropType),
       epicSkins: toText(payload.epicSkins),
       createdAt: Date.now(),
     }
@@ -217,9 +217,47 @@ export function useAccountStore() {
     server.accountLevel = toLevel(payload.accountLevel)
     server.battlePassLevel = toLevel(payload.battlePassLevel)
     server.farmLevel = toLevel(payload.farmLevel)
-    server.cropType = normaliseCrop(payload.cropType)
+    server.cropType = normaliseCropType(payload.cropType)
     server.epicSkins = toText(payload.epicSkins)
     return true
+  }
+
+  function setServerCropType(id, cropType) {
+    const server = getServer(id)
+    if (!server) return null
+    server.cropType = normaliseCropType(cropType)
+    return server.cropType
+  }
+
+  function cycleServerCropType(id) {
+    const server = getServer(id)
+    if (!server) return null
+    return setServerCropType(id, nextCropType(server.cropType))
+  }
+
+  function getServersInGroup(groupId) {
+    const group = getGroup(groupId)
+    if (!group) return []
+
+    const result = []
+
+    function walk(currentGroup, groupPath) {
+      const directServers = currentGroup.children.filter((item) => item.type === 'server')
+      directServers.forEach((server) => {
+        result.push({
+          server,
+          groupPath: [...groupPath],
+        })
+      })
+
+      const childGroups = currentGroup.children.filter((item) => item.type === 'group')
+      childGroups.forEach((childGroup) => {
+        walk(childGroup, [...groupPath, childGroup.name])
+      })
+    }
+
+    walk(group, [])
+    return result
   }
 
   function deleteNode(id) {
@@ -298,6 +336,9 @@ export function useAccountStore() {
     addServer,
     renameGroup,
     updateServer,
+    setServerCropType,
+    cycleServerCropType,
+    getServersInGroup,
     deleteNode,
     moveChild,
     canMove,
