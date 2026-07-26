@@ -9,6 +9,7 @@ import './mobile-header.css'
 import './quick-crop-recorder.css'
 import './farm-workflow-phase2.css'
 import './farm-workflow-phase3.css'
+import './farm-workflow-phase4.css'
 import App from './App.vue'
 import UpdateLauncher from './components/UpdateLauncher.vue'
 import {

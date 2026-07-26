@@ -7,11 +7,15 @@ import {
 } from '../domain/cropTypes.js'
 import { formatFarmTargetTime } from '../domain/farmCalculator.js'
 import { formatFarmCountdown } from '../domain/farmReminders.js'
+import { analyseFarmActionRecords } from '../domain/farmActions.js'
+import FarmActionQueue from './FarmActionQueue.vue'
 
 const props = defineProps({
   group: { type: Object, required: true },
   breadcrumbs: { type: Array, required: true },
   recordableServerCount: { type: Number, default: 0 },
+  recursiveServerRecords: { type: Array, default: () => [] },
+  actionView: { type: String, default: 'action' },
   nowMs: { type: Number, required: true },
 })
 
@@ -26,12 +30,17 @@ const emit = defineEmits([
   'cycle-server-crop',
   'open-farm-calculator',
   'open-quick-recorder',
+  'update-action-view',
+  'farm-action-command',
 ])
 
 const cropPromptServerId = ref('')
 const childGroups = computed(() => props.group.children.filter((item) => item.type === 'group'))
 const servers = computed(() => props.group.children.filter((item) => item.type === 'server'))
 const isEmpty = computed(() => props.group.children.length === 0)
+const actionAnalysis = computed(() => (
+  analyseFarmActionRecords(props.recursiveServerRecords, props.nowMs)
+))
 
 function cropCycleLabel(server) {
   return `${server.serverName}，当前为${cropTypeToLabel(server.cropType)}，点击切换为${cropTypeToLabel(nextCropType(server.cropType))}`
@@ -108,6 +117,19 @@ function openFarmCalculator(server, event) {
         </div>
       </div>
 
+      <FarmActionQueue
+        v-if="actionView === 'action' && actionAnalysis.records.length"
+        :records="actionAnalysis.records"
+        :summary="actionAnalysis.summary"
+        :group-name="group.name"
+        :now-ms="nowMs"
+        :recordable-server-count="recordableServerCount"
+        @update-view="emit('update-action-view', $event)"
+        @primary-command="emit('farm-action-command', $event)"
+        @cycle-server-crop="emit('cycle-server-crop', $event)"
+        @open-quick-recorder="emit('open-quick-recorder')"
+      />
+
       <section v-if="childGroups.length" class="content-section">
         <div class="section-heading">
           <div>
@@ -147,7 +169,10 @@ function openFarmCalculator(server, event) {
         </div>
       </section>
 
-      <section v-if="servers.length || recordableServerCount" class="content-section server-section">
+      <section
+        v-if="actionView === 'original' && (servers.length || recordableServerCount)"
+        class="content-section server-section"
+      >
         <div class="section-heading">
           <div>
             <span class="section-kicker">Servers</span>
@@ -162,6 +187,12 @@ function openFarmCalculator(server, event) {
             >
               快速记录
             </button>
+            <div class="farm-action-view-switch" role="group" aria-label="区服账号查看模式">
+              <button type="button" aria-pressed="false" @click="emit('update-action-view', 'action')">
+                行动优先
+              </button>
+              <button class="active" type="button" aria-pressed="true">原顺序</button>
+            </div>
             <span class="count-badge">{{ servers.length }}</span>
           </div>
         </div>
