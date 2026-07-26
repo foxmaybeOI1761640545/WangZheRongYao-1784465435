@@ -26,21 +26,22 @@
 3. 点一下设置提醒；
 4. 到时间后进入游戏处理对应账号。
 
-当前只完成第一阶段，没有提前引入计算公式、倒计时、通知或闹钟。
+第一阶段已经合并并发布；当前进入第二阶段，只实现批量作物调整、农场时间纯计算和结果保存，不提前引入倒计时、通知或闹钟。
 
 ## 3. 唯一开发基线
 
 - 仓库：`foxmaybeOI1761640545/WangZheRongYao-1784465435`
-- Release Tag：`20260724-163721-future-1784566876-AndroidApp-v1.0.10`
-- 基线提交：`5e0d30cd3e10f404c17a9881e1435d7d295b95e9`
+- Release Tag：`20260726-130921-future-1784566876-AndroidApp-v1.0.11`
+- 基线提交：`329ea496804294569b232a75e2591b96826e631c`
+- Release：v1.0.11 Android Beta Pre-release，已发布且不可变；
 - 基线分支来源：直接从上述 Tag 创建，不修改 Tag、`main` 或原 Android 分支。
 
 ## 4. 当前开发分支
 
-- 分支：`future/1785038335/FarmWorkflowPhase1`
-- 阶段：第一阶段——降低作物记录成本
-- 合并状态：未合并
-- 发布状态：第一阶段功能已完成，正在进行 v1.0.11 Beta Pre-release 发布前验证
+- 分支：`future/1785045626/FarmWorkflowPhase2`
+- 阶段：第二阶段——批量作物调整与农场时间计算
+- 第一阶段状态：已通过 PR #8 合并到 `future/1784566876/AndroidApp`
+- 发布状态：v1.0.11 Beta Pre-release 已发布且不可变；第二阶段保持 Draft，不发布 v1.0.12
 
 ## 5. 当前技术栈
 
@@ -59,21 +60,28 @@
 | 路径 | 职责 |
 | --- | --- |
 | `src/domain/cropTypes.js` | 作物合法值、代码、标签、规范化和循环纯函数 |
-| `src/composables/useAccountStore.js` | 数据水合、树操作、即时持久化、原子作物更新、递归账号读取 |
-| `src/components/GroupBrowser.vue` | 普通主页、账号卡片主体导航、作物直接循环、快速记录入口 |
-| `src/components/QuickCropRecorder.vue` | 紧凑单列快速记录模式 |
+| `src/domain/farmCalculator.js` | 8/16/32 小时参数、成熟公式、schedule 校验、时间与时长格式化 |
+| `src/domain/accountBackup.js` | Schema 1/2 迁移、Schema 2 导出及非法 schedule 清理 |
+| `src/composables/useAccountStore.js` | 数据水合、树操作、即时持久化、批量作物、撤销与 schedule 原子保存 |
+| `src/components/GroupBrowser.vue` | 普通主页、作物循环、农场时间入口与紧凑结果展示 |
+| `src/components/QuickCropRecorder.vue` | 单账号快速记录、批量选择、目标确认和一次撤销入口 |
+| `src/components/FarmTimeCalculator.vue` | 单账号倒计时输入、结果预览和明确保存 |
 | `src/components/ServerDetail.vue` | 详情展示、单项编辑与完整资料编辑 |
-| `src/components/BackupCenter.vue` | Schema Version 1 导入导出与 GitHub 备份 |
+| `src/components/BackupCenter.vue` | Schema 1/2 导入、Schema 2 导出与 GitHub 备份 |
 | `src/App.vue` | 路由、弹窗、快速记录模式生命周期、Esc 和 Android 返回键优先级 |
 | `src/platform/nativeAppShell.js` | Capacitor 原生返回键桥接与表单 Enter 导航 |
 | `src/quick-crop-recorder.css` | 普通主页作物按钮覆盖及快速记录响应式样式 |
 | `tests/cropTypes.test.js` | 作物模型、旧数据、即时持久化、原子更新和递归顺序测试 |
+| `tests/farmCalculator.test.js` | 公式、边界、秒级取整和格式化测试 |
+| `tests/accountStoreFarm.test.js` | 批量、撤销、作物变化清理和 schedule 原子方法测试 |
+| `tests/backupMigration.test.js` | Schema 1/2 导入导出迁移测试 |
+| `docs/FARM_WORKFLOW_DATA.md` | 第二阶段数据结构、备份兼容和降级说明 |
 | `docs/ANDROID*.md` | Android 构建、更新与签名说明 |
 | `docs/IMMUTABLE_RELEASE.md` | Release Immutability 流程 |
 
 ## 7. 当前账号数据结构
 
-第一阶段保持 Schema Version 1，不增加计时字段。账号节点结构为：
+v1.0.11 基线账号保持 Schema Version 1；第二阶段在账号节点增加可选的 `farmSchedule`，备份升级为 Schema Version 2：
 
 ```js
 {
@@ -88,12 +96,13 @@
   battlePassLevel: 0,
   farmLevel: 0,
   cropType: '',
+  farmSchedule: null,
   epicSkins: '',
   createdAt: 0,
 }
 ```
 
-分组节点继续使用 `children` 保存子分组和账号。`id`、`parentId`、`createdAt` 与其他资料不会被主页作物快速修改覆盖。
+合法 `farmSchedule` 使用内部 `schemaVersion: 1`，保存计算输入快照、浇水时间、当前预计成熟时间、理论最快成熟时间和公式中间量，时间戳统一为 Unix 毫秒数。分组节点继续使用 `children` 保存子分组和账号。`id`、`parentId`、`createdAt` 与其他资料不会被主页或批量作物操作覆盖。
 
 ## 8. 作物值、代码与标签映射
 
@@ -157,17 +166,25 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 创建本路线文档与 `AGENTS.md`。
 - [x] 明确 Android 构建采用方案 B：CI 安装固定 Gradle，不提交 Gradle Wrapper。
 - [x] 方案 B Android Debug PR 检查已成功并产出 `app-debug.apk`。
-- [ ] 合并并发布 v1.0.11 Beta Pre-release。
+- [x] 通过 PR #8 合并到 `future/1784566876/AndroidApp`。
+- [x] 发布不可变的 v1.0.11 Android Beta Pre-release。
 
 ## 11. 尚未完成
 
 ### 第二阶段
 
-- [ ] 抽取 FarmCalculator 纯计算逻辑；
-- [ ] 从账号作物自动选择 8/16/32 小时参数；
-- [ ] 输入当前成熟剩余和当前水分剩余；
-- [ ] 保存计算时间、理论最快成熟时间和下一次浇水时间；
-- [ ] 在账号卡片展示计算结果。
+- [x] 增加递归范围内的批量选择、全选、清空和固定作物目标；
+- [x] 增加批量确认与最近一次批量操作撤销；
+- [x] 抽取 FarmCalculator 纯计算逻辑；
+- [x] 从账号作物自动选择 8/16/32 小时参数；
+- [x] 输入当前成熟剩余和当前水分剩余；
+- [x] 仅在明确点击“保存结果”后写入计算结果；
+- [x] 保存计算时间、当前预计成熟、理论最快成熟和下一次浇水时间；
+- [x] 在账号卡片展示计算结果；
+- [x] 作物实际变化时集中清理旧 schedule，相同作物保留；
+- [x] 备份升级为 Schema 2，并继续导入 Schema 1；
+- [x] 完成计算、批量、撤销和迁移自动化测试；
+- [ ] 等待 Draft PR 的方案 B Android Debug CI。
 
 ### 第三阶段
 
@@ -280,12 +297,12 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 1. 先从参考项目抽出不依赖 Vue 状态和 DOM 的纯函数；
 2. 为 8/16/32 小时作物建立明确配置；
 3. 账号作物为未记录时禁止直接计算并给出轻量提示；
-4. 支持成熟倒计时和具体时间两种输入语义时，必须保留参考项目的有效日期判断；
+4. 本阶段只支持成熟倒计时输入，不复制参考项目的具体时间模式；
 5. 输入当前水分剩余；
 6. 计算本次浇水减少、浇水后剩余、理论最快剩余、节省时间和预计最快成熟时间；
 7. 将同一次计算使用的 `now` 固化，避免跨秒产生不一致；
 8. 将结果保存到目标账号，而不是只保存在临时组件状态；
-9. 增加边界、非法输入、跨日和 32 小时作物测试；
+9. 增加边界、非法输入、跨日格式化和 32 小时作物测试；
 10. 计算与展示分离，主页只消费结果。
 
 ## 16. FarmCalculator 参考版本和代码位置
@@ -301,29 +318,37 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
   - 约第 488–492 行：水分减少与理论最快成熟公式。
 - 第二阶段应把这些业务部分抽到本项目新的纯函数模块，例如 `src/domain/farmCalculator.js`，不要复制整个参考组件。
 
-## 17. 第二阶段计划增加的数据字段
+## 17. 第二阶段采用的数据字段
 
-字段名在实施前仍需通过测试和迁移设计确认，建议最小集合：
+实施后账号使用以下可选字段：
 
 ```js
 {
-  calculation: {
-    calculatedAt: 'ISO-8601',
+  farmSchedule: {
+    schemaVersion: 1,
+    cropType: '8',
+    calculatedAt: 1800000000000,
     matureLeftMinutes: 0,
     waterLeftMinutes: 0,
-    fastestMatureAt: 'ISO-8601',
-    nextWaterAt: 'ISO-8601',
+    reportedMatureAt: 1800000000000,
+    nextWaterAt: 1800000000000,
+    fastestMatureAt: 1800000000000,
+    fastestLeftMinutes: 0,
+    savedMinutes: 0,
+    elapsedSinceLastWaterMinutes: 0,
+    currentWaterReduceMinutes: 0,
+    matureAfterWaterMinutes: 0,
   },
 }
 ```
 
 原则：
 
-- 不保存可由其他字段稳定推导的重复值；
-- 时间使用绝对 ISO 时间，输入快照保留分钟值；
-- 未记录作物时 `calculation` 应为空；
-- 作物改变后必须明确清除或标记旧计算失效；
-- 增加字段前先设计旧 Schema Version 1 的惰性迁移与备份兼容测试。
+- 时间使用 Unix 毫秒数，输入与公式快照使用分钟；
+- 未记录作物时 `farmSchedule` 必须为 null；
+- 作物实际改变后清除旧 schedule，相同作物保留；
+- 旧 Schema Version 1 惰性迁移为 `farmSchedule: null`；
+- Store 保存和备份导入都调用同一规范化校验。
 
 ## 18. 第三阶段提醒和闹钟规划
 
@@ -359,19 +384,20 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 
 ## 21. 数据迁移和备份兼容策略
 
-1. Schema Version 1 当前继续有效；
+1. Schema Version 1 继续作为可导入的旧格式；
 2. 水合层负责把缺失或非法 `cropType` 规范化为 `''`；
 3. 旧 `8/16/32` 字符串不转换含义；
 4. 导出允许 `cropType: ''`；
-5. 第一阶段不提升 Schema 版本；
-6. 第二阶段若增加嵌套字段，优先采用可缺省结构并增加往返测试；
+5. 第二阶段导出升级为 Schema Version 2，并包含合法 `farmSchedule`；
+6. Schema 1 导入时自动补充 `farmSchedule: null`；Schema 2 导入会规范化并恢复合法 schedule；
 7. 导入始终先校验备份对象、应用名和根分组结构；
 8. PAT 与 GitHub 配置不进入数据快照；
 9. 不修改无关的备份仓库默认值。
+10. v1.0.11 重新导出数据可能丢失第二阶段字段，降级前必须保留 Schema 2 JSON。
 
 ## 22. Android 注意事项
 
-- 返回键顺序保持：顶层弹窗 → 完整编辑取消 → 注册处理器 → WebView 历史；
+- 返回键顺序保持：顶层确认/弹窗 → 农场计算面板 → 批量模式 → 快速记录 → 完整编辑取消 → WebView 历史；
 - 快速记录通过现有注册处理器接入，不新增原生监听；
 - 表单 Enter 导航由 `installFormEnterNavigation` 统一管理；
 - 输入框继续保留 Android 软键盘滚动余量和 `enterkeyhint`；
@@ -401,15 +427,15 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 ## 24. 下一位 AI 的具体开始步骤
 
 1. 完整阅读本文件；
-2. 检查当前分支与远程 PR，不要从 `main` 猜测状态；
+2. 检查 `future/1785045626/FarmWorkflowPhase2` 与远程 Draft PR，不要从 `main` 猜测状态；
 3. 执行 `git status -sb`，确认没有无关改动；
-4. 执行 `npm ci`、`npm test` 和 `npm run build`；
+4. 执行 `npm ci`、`npm test`、`npm run build`、`npm run build:android` 和 `npm run sync:android`；
 5. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
-6. 若开始第二阶段，只读参考 FarmCalculator 指定 Tag；
-7. 先抽取纯计算逻辑和测试，不复制 UI；
-8. 设计新增字段与 Schema Version 1 兼容策略；
+6. 若修复第二阶段，只围绕批量作物、farmSchedule、Schema 2 和快速计算，不扩展通知或排序；
+7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.12；
+8. 第三阶段必须在第二阶段另行验收、合并和发布后，从新的不可变基线开始；
 9. 不提前实现第三阶段闹钟、第四阶段排序或第五阶段战令提醒；
-10. 修改完成后更新本文件的阶段、测试、风险和提交记录。
+10. 修改完成后更新本文件的测试、风险、PR 和提交记录。
 
 ## 25. 更新日志
 
@@ -417,3 +443,114 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 | --- | --- | --- |
 | 2026-07-26 | `68c3d93` | 统一作物模型；支持未记录；增加原子更新、递归账号读取、自动化测试；同步锁文件 |
 | 2026-07-26 | `028937a` | 主页直接循环作物；新增快速记录模式；兼容详情编辑；接入 Esc 与 Android 返回键；增加响应式样式 |
+| 2026-07-26 | `4f3ff8a` | 抽取农场时间纯计算、固定业务参数、schedule 校验与统一格式化 |
+| 2026-07-26 | `3e90574` | 增加 farmSchedule Store 原子方法、批量更新/撤销和 Schema 2 迁移 |
+| 2026-07-26 | `551de1d` | 增加批量选择与确认、快速计算面板、主页时间展示和返回键优先级 |
+| 2026-07-26 | `c595e6c` | 增加计算公式、批量/撤销和 Schema 1/2 迁移测试 |
+
+## 26. 第二阶段批量作物与撤销设计
+
+操作路径：
+
+1. 从当前分组进入“快速记录”；
+2. 点击“批量调整”；
+3. 选择账号，或全选当前递归范围；
+4. 从 `--- / 8 / 1 / 3` 选择固定目标；
+5. 点击“将 N 个账号设为 X 小时作物”；
+6. 在单次确认中核对数量、目标和分组范围；
+7. 一次完成 Store 原子修改。
+
+`setServersCropType` 先去重 ID，忽略不存在或不是账号的 ID，只修改作物实际变化的账号。实际变化会清除旧 `farmSchedule`；相同作物计入 skipped 并保留 schedule。最近一次批量操作的 changes 快照只保存在快速记录页面内存中，离开页面即清除。撤销调用 `restoreServersCropState`，逐个恢复 changes 中的原作物与原 schedule，不重新导入整棵账号树。
+
+## 27. 第二阶段 FarmCalculator 公式
+
+公式来源：
+
+- 参考仓库：`foxmaybeOI1761640545/FarmCalculator-1783136145`
+- 参考 Tag：`20260707-203227-codex-2026-07-07-03-15-40-utc-app-shell-v1.0.6`
+- 参考提交：`66c42e45ebca8b759b95a168f58a5943574bf63f`
+- 只抽取指定 `src/App.vue` 中的固定参数、校验与核心公式，没有复制界面、具体时间模式或原生返回监听。
+
+统一参数：
+
+| 作物 | 基础成熟 | 水分最大维持 |
+| --- | ---: | ---: |
+| 8 小时 | 480 分钟 | 160 分钟 |
+| 16 小时 | 960 分钟 | 320 分钟 |
+| 32 小时 | 1920 分钟 | 640 分钟 |
+
+计算顺序为：已消耗水分 → 本次浇水减少 → 浇水后剩余 → `4/5` 理论最快剩余 → 理论节省。`fastestMatureAt` 严格按参考项目对 `fastestLeftMinutes × 60` 秒向上取整。同一次计算只使用一个 `now`，预览不会写入账号；只有点击“保存结果”才调用 `setServerFarmSchedule`。
+
+## 28. 第二阶段 farmSchedule 与 Schema 2
+
+```js
+farmSchedule: {
+  schemaVersion: 1,
+  cropType: '8',
+  calculatedAt: 1800000000000,
+  matureLeftMinutes: 420,
+  waterLeftMinutes: 80,
+  reportedMatureAt: 1800025200000,
+  elapsedSinceLastWaterMinutes: 80,
+  currentWaterReduceMinutes: 20,
+  matureAfterWaterMinutes: 400,
+  fastestLeftMinutes: 320,
+  savedMinutes: 100,
+  nextWaterAt: 1800004800000,
+  fastestMatureAt: 1800019200000,
+}
+```
+
+- 新账号和 v1.0.11 旧账号默认 `farmSchedule: null`；
+- 时间戳必须为有限正数，分钟必须为有限非负数；
+- schedule 作物必须与账号当前合法作物一致；
+- 未记录作物不能保存 schedule；
+- Schema 2 导出包含合法 schedule，不包含 PAT；
+- Schema 1 与无外层 Schema 的旧根对象导入后 schedule 为 null；
+- Schema 2 非法或不完整 schedule 在导入时丢弃；
+- 详细降级说明见 `docs/FARM_WORKFLOW_DATA.md`。
+
+## 29. 第二阶段主页与计算面板
+
+主页仍保持紧凑双列。账号卡片主体进入详情，作物方块切换作物，删除按钮只打开删除确认，底部时间区域打开计算面板，四类点击互相隔离。未记录作物点击时间区域会显示“请先设置当前作物类型”，并把焦点移到作物按钮。
+
+计算面板只提供倒计时输入，自动带入账号当前作物。四个数字输入框继续复用全局 Enter 导航，最后一项 Enter 执行计算。结果预览显示理论最快成熟、下一次浇水、当前预计成熟和理论节省，并提供“保存结果”“重新输入”“取消”。
+
+Esc 与 Android 返回键顺序为：最上层确认/弹窗 → 计算面板 → 批量模式 → 快速记录 → 完整编辑 → 页面历史。仍只使用 `nativeAppShell.js` 的单一 Capacitor 返回监听。
+
+## 30. 第二阶段验证记录
+
+| 命令/检查 | 当前结果 |
+| --- | --- |
+| `npm test` | 通过，23/23 |
+| `npm run build` | 通过 |
+| 360/390/430/1366px 自动化 | 通过，无横向溢出；批量栏、复选框、只读作物方块和主页时间行未重叠 |
+| 计算面板交互 | 通过；预览不提前保存，明确保存后持久化，未记录作物会聚焦作物按钮 |
+| 批量与撤销交互 | 通过；不同作物清除 schedule，一次撤销恢复作物和 schedule |
+| 360×500 软键盘收缩模拟 | 通过；Enter 导航后最后输入框保持在可见视口 |
+| Esc 优先级 | 通过；批量确认、批量模式和快速记录按顺序退出 |
+| `npm ci` | 通过，安装 131 个包 |
+| `npm run build` | 通过 |
+| `npm run build:android` | 通过 |
+| `npm run sync:android` | 通过；验证后恢复 Capacitor 生成文件格式差异，不提交无关改动 |
+| 方案 B Android Debug CI | 待 Draft PR 运行 |
+
+## 31. 第二阶段未实现与风险
+
+未实现且不得提前开始：Android AlarmManager、系统/浏览器通知、后台倒计时、每秒刷新、自动排序、红黄绿紧急状态、自动打开游戏和战令提醒。
+
+已知风险：
+
+1. 当前执行环境没有真实 Android 设备，软键盘和系统返回键以响应式浏览器自动化、单一监听代码路径和方案 B Debug CI 为验证依据；
+2. v1.0.11 重新导出会丢失第二阶段字段，降级前必须保存 Schema 2 JSON；
+3. 批量撤销只保留页面内最近一次操作，离开快速记录后不可撤销；
+4. 主页时间使用打开/重绘时的当前时间格式化，不引入实时倒计时；
+5. 第二阶段 Draft PR 不合并，因此不会触发 Android Signed Release 或创建 v1.0.12。
+
+## 32. 第二阶段 PR 与提交
+
+- 开发分支：`future/1785045626/FarmWorkflowPhase2`
+- PR Base：`future/1784566876/AndroidApp`
+- Draft PR：待创建
+- 合并：禁止，本阶段保持 Draft
+- 发布：禁止，不创建 v1.0.12
