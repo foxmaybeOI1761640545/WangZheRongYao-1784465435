@@ -184,7 +184,7 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 作物实际变化时集中清理旧 schedule，相同作物保留；
 - [x] 备份升级为 Schema 2，并继续导入 Schema 1；
 - [x] 完成计算、批量、撤销和迁移自动化测试；
-- [ ] 等待 Draft PR 的方案 B Android Debug CI。
+- [x] Draft PR 的方案 B Android Debug CI 成功并产出 `app-debug.apk`。
 
 ### 第三阶段
 
@@ -533,7 +533,7 @@ Esc 与 Android 返回键顺序为：最上层确认/弹窗 → 计算面板 →
 | `npm run build` | 通过 |
 | `npm run build:android` | 通过 |
 | `npm run sync:android` | 通过；验证后恢复 Capacitor 生成文件格式差异，不提交无关改动 |
-| 方案 B Android Debug CI | 待 Draft PR 运行 |
+| 方案 B Android Debug CI | 通过：[Verify Android App #30190940979](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30190940979)，下载确认 `app-debug.apk` 为 3,921,689 bytes |
 
 ## 31. 第二阶段未实现与风险
 
@@ -551,6 +551,35 @@ Esc 与 Android 返回键顺序为：最上层确认/弹窗 → 计算面板 →
 
 - 开发分支：`future/1785045626/FarmWorkflowPhase2`
 - PR Base：`future/1784566876/AndroidApp`
-- Draft PR：待创建
+- Draft PR：[PR #9](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/9)
 - 合并：禁止，本阶段保持 Draft
 - 发布：禁止，不创建 v1.0.12
+
+完整实现提交：
+
+| 提交 | 内容 |
+| --- | --- |
+| `4f3ff8afa92a720ec381cd343b3c2d8a9dbb1d50` | 农场成熟时间纯计算、参数、校验与格式化 |
+| `3e905748ce8371d58341f50de410df301dfb265a` | farmSchedule、Store 原子方法、批量/撤销与 Schema 2 |
+| `551de1df5566a6ff135f3cbcfdd5021e1d2f3581` | 批量 UI、计算面板、主页时间入口和返回键 |
+| `c595e6c864e236feebe2ffa8849498b7bf79d91c` | 计算、批量、撤销和迁移测试 |
+| `013a23384dfb612d0025f5326d582a78683aa663` | 第二阶段路线和数据兼容说明 |
+
+第二阶段修改文件：
+
+- `src/domain/farmCalculator.js`
+- `src/domain/accountBackup.js`
+- `src/composables/useAccountStore.js`
+- `src/components/BackupCenter.vue`
+- `src/components/QuickCropRecorder.vue`
+- `src/components/FarmTimeCalculator.vue`
+- `src/components/GroupBrowser.vue`
+- `src/App.vue`
+- `src/platform/nativeAppShell.js`
+- `src/farm-workflow-phase2.css`
+- `src/main.js`
+- `tests/farmCalculator.test.js`
+- `tests/accountStoreFarm.test.js`
+- `tests/backupMigration.test.js`
+- `docs/FARM_WORKFLOW_DATA.md`
+- `FARM_WORKFLOW_ROADMAP.md`
