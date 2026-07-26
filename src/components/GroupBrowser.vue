@@ -6,11 +6,13 @@ import {
   nextCropType,
 } from '../domain/cropTypes.js'
 import { formatFarmTargetTime } from '../domain/farmCalculator.js'
+import { formatFarmCountdown } from '../domain/farmReminders.js'
 
 const props = defineProps({
   group: { type: Object, required: true },
   breadcrumbs: { type: Array, required: true },
   recordableServerCount: { type: Number, default: 0 },
+  nowMs: { type: Number, required: true },
 })
 
 const emit = defineEmits([
@@ -36,7 +38,7 @@ function cropCycleLabel(server) {
 }
 
 function compactTargetTime(timestamp) {
-  return formatFarmTargetTime(timestamp).replace(/^今日\s+/, '')
+  return formatFarmTargetTime(timestamp, props.nowMs).replace(/^今日\s+/, '')
 }
 
 function openFarmCalculator(server, event) {
@@ -191,8 +193,14 @@ function openFarmCalculator(server, event) {
                 请先设置当前作物类型
               </span>
               <template v-else-if="server.farmSchedule">
-                <span>浇水 {{ compactTargetTime(server.farmSchedule.nextWaterAt) }}</span>
-                <span>最快 {{ compactTargetTime(server.farmSchedule.fastestMatureAt) }}</span>
+                <span>
+                  浇水 {{ formatFarmCountdown(server.farmSchedule.nextWaterAt, nowMs, '已到浇水时间') }}
+                  <small>{{ compactTargetTime(server.farmSchedule.nextWaterAt) }}</small>
+                </span>
+                <span>
+                  最快 {{ formatFarmCountdown(server.farmSchedule.fastestMatureAt, nowMs, '已到最快成熟时间') }}
+                  <small>{{ compactTargetTime(server.farmSchedule.fastestMatureAt) }}</small>
+                </span>
               </template>
               <span v-else>计算时间</span>
             </button>

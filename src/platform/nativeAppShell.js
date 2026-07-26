@@ -36,7 +36,16 @@ function isVisible(element) {
 /** 优先关闭最上层弹窗，复用页面已有关闭按钮，避免复制组件状态。 */
 export function closeVisibleOverlay() {
   const overlays = [...document.querySelectorAll('.modal-backdrop')].filter(isVisible)
-  const overlay = overlays.at(-1)
+  const overlay = overlays
+    .map((element, index) => ({
+      element,
+      index,
+      zIndex: Number.parseInt(window.getComputedStyle(element).zIndex, 10) || 0,
+    }))
+    .sort((left, right) => (
+      left.zIndex - right.zIndex || left.index - right.index
+    ))
+    .at(-1)?.element
   if (!overlay) return false
 
   const closeButton = overlay.querySelector(

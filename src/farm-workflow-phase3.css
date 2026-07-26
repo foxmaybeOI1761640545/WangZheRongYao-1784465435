@@ -1,0 +1,198 @@
+.compact-farm-time > span {
+  min-width: 0;
+}
+
+.compact-farm-time small {
+  display: block;
+  margin-top: 2px;
+  color: #7a8495;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.farm-calculator-modal {
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+}
+
+.farm-reminder-settings {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #d8e2f0;
+  border-radius: 18px;
+  background: #f7f9fd;
+}
+
+.farm-reminder-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.farm-reminder-heading h4 {
+  margin: 3px 0 0;
+  color: #1d3157;
+  font-size: 18px;
+}
+
+.reminder-capability {
+  max-width: 170px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #4d5c73;
+  background: #e7edf7;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: center;
+}
+
+.reminder-capability.exact {
+  color: #16603a;
+  background: #dff4e7;
+}
+
+.reminder-capability.inexact {
+  color: #73551a;
+  background: #fff1ca;
+}
+
+.reminder-capability.denied {
+  color: #8a3038;
+  background: #ffe6e9;
+}
+
+.farm-reminder-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid #dce5f2;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.farm-reminder-option input {
+  width: 20px;
+  height: 20px;
+  accent-color: #31588f;
+}
+
+.farm-reminder-option span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.farm-reminder-option strong {
+  color: #233b65;
+}
+
+.farm-reminder-option small {
+  overflow-wrap: anywhere;
+  color: #68758a;
+}
+
+.farm-reminder-option em {
+  color: #56657c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
+}
+
+.farm-reminder-boundary,
+.farm-reminder-notice {
+  margin: 0;
+  color: #69758a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.farm-reminder-notice {
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: #31506f;
+  background: #e8f2fc;
+}
+
+.farm-manual-copy {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+}
+
+.farm-reminder-copy-actions,
+.farm-reminder-setting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.farm-reminder-setting-actions {
+  justify-content: flex-end;
+}
+
+.farm-reminder-setting-actions .button {
+  width: auto;
+}
+
+.reminder-permission-backdrop {
+  z-index: 120;
+}
+
+.reminder-permission-modal p {
+  color: #58667b;
+  line-height: 1.7;
+}
+
+@media (max-width: 520px) {
+  .farm-reminder-settings {
+    padding: 13px;
+  }
+
+  .farm-reminder-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reminder-capability {
+    max-width: none;
+    justify-self: start;
+  }
+
+  .farm-reminder-option {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .farm-reminder-option em {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .farm-reminder-copy-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .farm-reminder-setting-actions .button {
+    width: 100%;
+  }
+}
+
+@media (max-height: 560px) {
+  .farm-calculator-backdrop {
+    align-items: flex-start;
+  }
+
+  .farm-calculator-modal {
+    margin-block: 8px;
+    max-height: calc(100dvh - 16px);
+  }
+}

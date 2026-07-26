@@ -5,20 +5,40 @@ import FarmTimeCalculator from './components/FarmTimeCalculator.vue'
 import GroupBrowser from './components/GroupBrowser.vue'
 import QuickCropRecorder from './components/QuickCropRecorder.vue'
 import ServerDetail from './components/ServerDetail.vue'
+import { useFarmClock, refreshFarmClock } from './composables/useFarmClock.js'
 import { CROP_OPTIONS } from './domain/cropTypes.js'
+import {
+  buildFarmReminderPlans,
+  formatFarmReminderCopyText,
+} from './domain/farmReminders.js'
 import {
   PLATFORM_OPTIONS,
   SYSTEM_OPTIONS,
   useAccountStore,
 } from './composables/useAccountStore.js'
 import {
+  browserNotificationPermission,
+  createFarmReminderAdapter,
+  requestBrowserNotificationPermission,
+  showBrowserFarmNotification,
+} from './platform/farmReminderAdapter.js'
+import {
   cancelVisibleEditor,
   closeVisibleOverlay,
   registerNativeBackHandler,
 } from './platform/nativeAppShell.js'
+import { createFarmReminderCoordinator } from './services/farmReminderCoordinator.js'
+import { createWebFarmReminderMonitor } from './services/webFarmReminderMonitor.js'
 
 const store = useAccountStore()
 const route = reactive({ type: 'group', id: 'root' })
+const nowMs = useFarmClock()
+const reminderAdapter = createFarmReminderAdapter()
+const nativeAndroid = reminderAdapter.isSupported()
+const reminderCoordinator = createFarmReminderCoordinator({
+  store,
+  adapter: reminderAdapter,
+})
 
 const showGroupDialog = ref(false)
 const showServerDialog = ref(false)
@@ -29,8 +49,21 @@ const quickGroupId = ref('')
 const quickBatchMode = ref(false)
 const quickBatchResult = ref(null)
 const farmCalculatorServerId = ref('')
+const reminderBusy = ref(false)
+const reminderNotice = ref('')
+const manualCopyText = ref('')
+const webPermission = ref(browserNotificationPermission())
+const reminderPermissionDialog = ref('')
+const reminderCapability = reactive({
+  capability: nativeAndroid ? 'denied' : 'unsupported',
+  displayPermission: nativeAndroid ? 'unknown' : 'unsupported',
+  exactPermission: nativeAndroid ? 'unknown' : 'unsupported',
+})
 let browserScrollPosition = 0
 let removeQuickBackHandler = null
+let removeReminderActionListener = null
+let removeAppStateListener = null
+let notificationRequestAttempted = false
 
 const groupForm = reactive({ name: '' })
 const settingsForm = reactive({ name: '' })
@@ -72,6 +105,80 @@ function navigateServer(id) {
   window.location.hash = `#/server/${encodeURIComponent(id)}`
 }
 
+function closeTransientUi() {
+  showGroupDialog.value = false
+  showServerDialog.value = false
+  showSettingsDialog.value = false
+  showBackupDialog.value = false
+  reminderPermissionDialog.value = ''
+  farmCalculatorServerId.value = ''
+  quickBatchMode.value = false
+  quickRecording.value = false
+  quickGroupId.value = ''
+}
+
+function handleReminderNavigation(serverId) {
+  closeTransientUi()
+  if (store.getServer(serverId)) navigateServer(serverId)
+  else navigateGroup('root')
+}
+
+function allWebReminderPlans() {
+  return store.getAllServersWithReminders().flatMap((server) => (
+    buildFarmReminderPlans(server, 0, { includePast: true })
+  ))
+}
+
+const webReminderMonitor = createWebFarmReminderMonitor({
+  getPlans: allWebReminderPlans,
+  notify: (plan) => showBrowserFarmNotification(
+    plan,
+    () => handleReminderNavigation(plan.serverId),
+  ),
+})
+
+function applyReminderResult(result, { resumed = false } = {}) {
+  const previousCapability = reminderCapability.capability
+  Object.assign(reminderCapability, {
+    capability: result.capability,
+    displayPermission: result.displayPermission,
+    exactPermission: result.exactPermission,
+  })
+  if (result.failed?.length) {
+    reminderNotice.value = result.failed[0].message
+  } else if (
+    resumed
+    && previousCapability === 'exact'
+    && result.capability === 'inexact'
+  ) {
+    reminderNotice.value = '精确提醒权限已关闭，部分提醒需要重新设置。'
+  }
+  return result
+}
+
+async function syncFarmReminders({ initialise = false, resumed = false } = {}) {
+  if (!nativeAndroid) {
+    webPermission.value = browserNotificationPermission()
+    if (webPermission.value === 'granted') webReminderMonitor.check(nowMs.value)
+    return {
+      capability: 'unsupported',
+      displayPermission: webPermission.value,
+      exactPermission: 'unsupported',
+      failed: [],
+    }
+  }
+
+  reminderBusy.value = true
+  try {
+    const result = initialise
+      ? await reminderCoordinator.initialise()
+      : await reminderCoordinator.synchronise()
+    return applyReminderResult(result, { resumed })
+  } finally {
+    reminderBusy.value = false
+  }
+}
+
 function handleEscape(event) {
   if (event.key !== 'Escape') return
   if (closeVisibleOverlay()) {
@@ -98,7 +205,7 @@ function handleEscape(event) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('hashchange', syncRoute)
   window.addEventListener('keydown', handleEscape)
   removeQuickBackHandler = registerNativeBackHandler(() => {
@@ -112,12 +219,44 @@ onMounted(() => {
   }, 100)
   if (!window.location.hash) navigateGroup('root')
   else syncRoute()
+
+  try {
+    removeReminderActionListener = await reminderAdapter.addActionListener(({ extra }) => {
+      if (
+        extra?.source === 'farm-reminder'
+        && Number(extra?.schemaVersion) === 1
+        && typeof extra?.serverId === 'string'
+      ) {
+        handleReminderNavigation(extra.serverId)
+      }
+    })
+  } catch {
+    reminderNotice.value = '通知点击监听初始化失败；已保存的提醒计划不受影响。'
+  }
+  try {
+    removeAppStateListener = await reminderAdapter.addAppStateListener(({ isActive }) => {
+      if (!isActive) return
+      refreshFarmClock()
+      void syncFarmReminders({ resumed: true })
+    })
+  } catch {
+    reminderNotice.value = '前台恢复监听初始化失败，请重新打开应用以校准提醒。'
+  }
+  await syncFarmReminders({ initialise: true })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncRoute)
   window.removeEventListener('keydown', handleEscape)
   removeQuickBackHandler?.()
+  removeReminderActionListener?.()
+  removeAppStateListener?.()
+})
+
+watch(nowMs, () => {
+  if (!nativeAndroid && webPermission.value === 'granted') {
+    webReminderMonitor.check(nowMs.value)
+  }
 })
 
 const currentGroup = computed(() => store.getGroup(route.id) ?? store.root.value)
@@ -158,34 +297,193 @@ function closeQuickRecorder({ restoreScroll = true } = {}) {
 
 function cycleServerCropType(serverId) {
   store.cycleServerCropType(serverId)
+  void syncFarmReminders()
 }
 
 function applyBatchCropType({ serverIds, cropType }) {
   quickBatchResult.value = store.setServersCropType(serverIds, cropType)
   quickBatchMode.value = false
+  void syncFarmReminders()
 }
 
 function undoBatchCropType() {
   if (!quickBatchResult.value) return
   store.restoreServersCropState(quickBatchResult.value.changes)
   quickBatchResult.value = null
+  void syncFarmReminders()
 }
 
 function openFarmCalculator(serverId) {
   const server = store.getServer(serverId)
   if (!server?.cropType) return
+  reminderNotice.value = ''
+  manualCopyText.value = ''
   farmCalculatorServerId.value = server.id
 }
 
 function closeFarmCalculator() {
   farmCalculatorServerId.value = ''
+  reminderNotice.value = ''
+  manualCopyText.value = ''
 }
 
-function saveFarmSchedule(schedule) {
+async function saveFarmScheduleOnly(schedule) {
   const serverId = farmCalculatorServerId.value
   if (!serverId) return
   const saved = store.setServerFarmSchedule(serverId, schedule)
-  if (saved) closeFarmCalculator()
+  if (!saved) return
+  await syncFarmReminders()
+  closeFarmCalculator()
+}
+
+function saveReminderPreferences(serverId, {
+  waterEnabled,
+  harvestEnabled,
+}) {
+  return store.setServerFarmReminderPreferences(serverId, {
+    waterEnabled,
+    harvestEnabled,
+  })
+}
+
+async function finishReminderPermissionFlow() {
+  if (nativeAndroid) {
+    const capability = await reminderCoordinator.readCapability()
+    Object.assign(reminderCapability, capability)
+    if (capability.displayPermission !== 'granted') {
+      if (!notificationRequestAttempted) {
+        reminderPermissionDialog.value = 'display'
+      } else {
+        reminderNotice.value = '通知权限未授予，计算结果已保存，但系统提醒未设置。'
+      }
+      return
+    }
+    const result = await syncFarmReminders()
+    if (result.skippedPast?.length && !result.failed.length) {
+      reminderNotice.value = '已保存提醒设置；已到期的时间不会补发系统通知。'
+    } else if (result.capability === 'inexact' && !result.failed.length) {
+      reminderNotice.value = '提醒已按普通模式设置，系统可能延迟送达；可手动打开精确提醒设置。'
+    } else if (!result.failed.length) {
+      reminderNotice.value = '农场提醒已设置。'
+    }
+    return
+  }
+
+  webPermission.value = browserNotificationPermission()
+  if (webPermission.value === 'default' && !notificationRequestAttempted) {
+    reminderPermissionDialog.value = 'display'
+    return
+  }
+  if (webPermission.value !== 'granted') {
+    reminderNotice.value = '网页通知权限未授予；页面内倒计时和复制时间仍可使用。'
+    return
+  }
+  webReminderMonitor.prime(nowMs.value)
+  reminderNotice.value = '网页提醒已开启；仅在当前页面保持打开时检查到期时间。'
+}
+
+async function saveFarmScheduleWithReminders({
+  schedule,
+  waterEnabled,
+  harvestEnabled,
+}) {
+  const serverId = farmCalculatorServerId.value
+  if (!serverId || !store.setServerFarmSchedule(serverId, schedule)) return
+  saveReminderPreferences(serverId, { waterEnabled, harvestEnabled })
+  if (!waterEnabled && !harvestEnabled) {
+    await syncFarmReminders()
+    reminderNotice.value = '农场时间已保存，系统提醒已关闭。'
+    return
+  }
+  await finishReminderPermissionFlow()
+}
+
+async function updateFarmReminders({
+  waterEnabled,
+  harvestEnabled,
+}) {
+  const serverId = farmCalculatorServerId.value
+  if (!serverId) return
+  const saved = saveReminderPreferences(serverId, {
+    waterEnabled,
+    harvestEnabled,
+  })
+  if (!saved) {
+    reminderNotice.value = '请先保存有效的农场时间。'
+    return
+  }
+  if (!waterEnabled && !harvestEnabled) {
+    await syncFarmReminders()
+    reminderNotice.value = '系统提醒已关闭；农场时间仍然保留。'
+    return
+  }
+  await finishReminderPermissionFlow()
+}
+
+function requestExactReminderSetting() {
+  if (!nativeAndroid) return
+  reminderPermissionDialog.value = 'exact'
+}
+
+async function confirmReminderPermissionDialog() {
+  const dialog = reminderPermissionDialog.value
+  reminderPermissionDialog.value = ''
+  reminderBusy.value = true
+  try {
+    if (dialog === 'exact') {
+      await reminderAdapter.openExactNotificationSetting()
+      const result = await syncFarmReminders({ resumed: true })
+      if (result.capability === 'exact') reminderNotice.value = '精确提醒权限已开启。'
+      return
+    }
+
+    notificationRequestAttempted = true
+    if (nativeAndroid) {
+      const permission = await reminderAdapter.requestDisplayPermission()
+      if (permission !== 'granted') {
+        reminderNotice.value = '通知权限被拒绝，计算结果已保留；系统提醒未设置。'
+        await syncFarmReminders()
+        return
+      }
+      await finishReminderPermissionFlow()
+      return
+    }
+
+    webPermission.value = await requestBrowserNotificationPermission()
+    if (webPermission.value === 'granted') {
+      webReminderMonitor.prime(nowMs.value)
+      reminderNotice.value = '网页提醒已开启；关闭页面后无法保证通知。'
+    } else {
+      reminderNotice.value = '网页通知权限被拒绝；页面内倒计时仍然可用。'
+    }
+  } catch (error) {
+    reminderNotice.value = error instanceof Error
+      ? error.message
+      : '提醒权限操作失败。'
+  } finally {
+    reminderBusy.value = false
+  }
+}
+
+async function copyFarmTime(reminderType) {
+  const server = farmCalculatorServer.value
+  if (!server) return
+  const types = reminderType === 'all'
+    ? ['water', 'harvest']
+    : [reminderType]
+  const text = formatFarmReminderCopyText(server, types)
+  if (!text) {
+    reminderNotice.value = '当前没有可复制的农场时间。'
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    manualCopyText.value = ''
+    reminderNotice.value = '农场时间已复制。'
+  } catch {
+    manualCopyText.value = text
+    reminderNotice.value = '自动复制失败，请在下方文本框中手动复制。'
+  }
 }
 
 watch(showSettingsDialog, (open) => {
@@ -229,14 +527,21 @@ function submitServer() {
 }
 
 function saveServer(payload) {
-  if (currentServer.value) store.updateServer(currentServer.value.id, payload)
+  if (currentServer.value) {
+    store.updateServer(currentServer.value.id, payload)
+    void syncFarmReminders()
+  }
 }
 
 function deleteServerById(id) {
   const server = store.getServer(id)
   if (!server || !window.confirm(`确定删除“${server.serverName}”及其全部资料吗？此操作无法撤销。`)) return
   const parentId = server.parentId || 'root'
-  store.deleteNode(server.id)
+  const deleted = store.deleteNode(server.id)
+  if (deleted?.notificationIds?.length) {
+    void reminderCoordinator.cancelNotificationIds(deleted.notificationIds)
+  }
+  void syncFarmReminders()
   if (route.type === 'server' && route.id === id) navigateGroup(parentId)
 }
 
@@ -254,7 +559,11 @@ function deleteGroupById(id) {
     : '该分组当前为空。'
   if (!window.confirm(`确定删除分组“${group.name}”及其全部下级内容吗？${detail}此操作无法撤销。`)) return
   const parentId = group.parentId || 'root'
-  store.deleteNode(group.id)
+  const deleted = store.deleteNode(group.id)
+  if (deleted?.notificationIds?.length) {
+    void reminderCoordinator.cancelNotificationIds(deleted.notificationIds)
+  }
+  void syncFarmReminders()
   if (route.type === 'group' && route.id === id) navigateGroup(parentId)
 }
 
@@ -311,6 +620,7 @@ function deleteCurrentGroup() {
         :group="currentGroup"
         :breadcrumbs="currentBreadcrumbs"
         :recordable-server-count="currentGroupServerRecords.length"
+        :now-ms="nowMs"
         @navigate-group="navigateGroup"
         @navigate-server="navigateServer"
         @add-group="openAddGroup"
@@ -347,9 +657,62 @@ function deleteCurrentGroup() {
   <FarmTimeCalculator
     v-if="farmCalculatorServer"
     :server="farmCalculatorServer"
+    :now-ms="nowMs"
+    :reminder-capability="reminderCapability"
+    :native-android="nativeAndroid"
+    :web-permission="webPermission"
+    :reminder-busy="reminderBusy"
+    :reminder-notice="reminderNotice"
+    :manual-copy-text="manualCopyText"
     @close="closeFarmCalculator"
-    @save="saveFarmSchedule"
+    @save-time="saveFarmScheduleOnly"
+    @save-reminders="saveFarmScheduleWithReminders"
+    @update-reminders="updateFarmReminders"
+    @request-exact="requestExactReminderSetting"
+    @copy="copyFarmTime"
   />
+
+  <div
+    v-if="reminderPermissionDialog"
+    class="modal-backdrop reminder-permission-backdrop"
+    @click.self="reminderPermissionDialog = ''"
+  >
+    <section
+      class="modal reminder-permission-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reminder-permission-title"
+    >
+      <div class="modal-heading">
+        <div>
+          <span class="section-kicker">Permission</span>
+          <h3 id="reminder-permission-title">
+            {{ reminderPermissionDialog === 'exact' ? '开启精确提醒' : nativeAndroid ? '允许系统通知' : '允许网页通知' }}
+          </h3>
+        </div>
+        <button class="icon-button" type="button" aria-label="关闭提醒权限说明" @click="reminderPermissionDialog = ''">×</button>
+      </div>
+      <template v-if="reminderPermissionDialog === 'exact'">
+        <p>
+          Android 会打开“闹钟和提醒”系统设置。只有你点击继续后才会跳转；关闭精确权限时，
+          提醒仍会尝试以普通模式安排，但可能延迟。
+        </p>
+      </template>
+      <template v-else>
+        <p>
+          {{ nativeAndroid
+            ? '通知权限用于在浇水和理论最快成熟时间显示本地系统通知。拒绝不会删除已保存的计算结果，也不会自动跳转设置。'
+            : '网页通知只在当前页面保持打开时用于提示浇水和收获时间；关闭浏览器后无法保证通知。' }}
+        </p>
+      </template>
+      <div class="modal-actions">
+        <button class="button secondary" type="button" @click="reminderPermissionDialog = ''">暂不开启</button>
+        <button class="button primary" type="button" :disabled="reminderBusy" @click="confirmReminderPermissionDialog">
+          {{ reminderPermissionDialog === 'exact' ? '打开系统设置' : '继续请求权限' }}
+        </button>
+      </div>
+    </section>
+  </div>
 
   <div v-if="showGroupDialog" class="modal-backdrop" @click.self="showGroupDialog = false">
     <form class="modal" @submit.prevent="submitGroup">

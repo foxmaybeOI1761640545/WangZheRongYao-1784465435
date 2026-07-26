@@ -6,16 +6,33 @@ import {
   formatFarmTargetTime,
   getFarmCropConfig,
 } from '../domain/farmCalculator.js'
+import FarmReminderSettings from './FarmReminderSettings.vue'
 
 const props = defineProps({
   server: { type: Object, required: true },
+  nowMs: { type: Number, required: true },
+  reminderCapability: { type: Object, required: true },
+  nativeAndroid: { type: Boolean, default: false },
+  webPermission: { type: String, default: 'default' },
+  reminderBusy: { type: Boolean, default: false },
+  reminderNotice: { type: String, default: '' },
+  manualCopyText: { type: String, default: '' },
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits([
+  'close',
+  'save-time',
+  'save-reminders',
+  'update-reminders',
+  'request-exact',
+  'copy',
+])
 
 const firstInput = ref(null)
 const error = ref('')
 const preview = ref(null)
+const waterEnabled = ref(true)
+const harvestEnabled = ref(true)
 const form = reactive({
   matureHours: '',
   matureMinutes: '',
@@ -39,8 +56,19 @@ function reset({ focus = false } = {}) {
   if (focus) void nextTick(() => firstInput.value?.focus())
 }
 
-watch(() => props.server.id, () => reset({ focus: true }))
+function resetReminderSelection() {
+  const reminders = props.server.farmReminders
+  waterEnabled.value = reminders ? reminders.water.enabled : true
+  harvestEnabled.value = reminders ? reminders.harvest.enabled : true
+}
+
+watch(() => props.server.id, () => {
+  resetReminderSelection()
+  reset({ focus: true })
+})
+watch(() => props.server.farmReminders, resetReminderSelection, { deep: true })
 onMounted(() => void nextTick(() => firstInput.value?.focus()))
+resetReminderSelection()
 
 function readPart(value, name, max) {
   const text = String(value ?? '').trim()
@@ -70,10 +98,31 @@ function calculate() {
   }
 }
 
-function save() {
+function saveTime() {
   if (!preview.value) return
-  emit('save', preview.value)
+  emit('save-time', preview.value)
 }
+
+function saveReminders() {
+  if (!preview.value) return
+  emit('save-reminders', {
+    schedule: preview.value,
+    waterEnabled: waterEnabled.value,
+    harvestEnabled: harvestEnabled.value,
+  })
+}
+
+function updateExistingReminders() {
+  emit('update-reminders', {
+    waterEnabled: waterEnabled.value,
+    harvestEnabled: harvestEnabled.value,
+  })
+}
+
+const reminderServer = computed(() => ({
+  ...props.server,
+  farmSchedule: preview.value ?? props.server.farmSchedule,
+}))
 </script>
 
 <template>
@@ -166,6 +215,25 @@ function save() {
             <button class="button secondary" type="button" @click="emit('close')">取消</button>
             <button class="button primary" type="submit">计算</button>
           </div>
+
+          <FarmReminderSettings
+            v-if="server.farmSchedule"
+            :server="reminderServer"
+            :water-enabled="waterEnabled"
+            :harvest-enabled="harvestEnabled"
+            :now-ms="nowMs"
+            :capability="reminderCapability"
+            :native-android="nativeAndroid"
+            :web-permission="webPermission"
+            :busy="reminderBusy"
+            :notice="reminderNotice"
+            :manual-copy-text="manualCopyText"
+            @update:water-enabled="waterEnabled = $event"
+            @update:harvest-enabled="harvestEnabled = $event"
+            @apply="updateExistingReminders"
+            @request-exact="emit('request-exact')"
+            @copy="emit('copy', $event)"
+          />
         </form>
 
         <section v-else class="farm-calculator-result" aria-live="polite">
@@ -193,8 +261,31 @@ function save() {
             水分最大维持：{{ formatFarmDuration(preview.waterMaxMinutes) }}
           </p>
 
+          <FarmReminderSettings
+            :server="reminderServer"
+            :water-enabled="waterEnabled"
+            :harvest-enabled="harvestEnabled"
+            :now-ms="nowMs"
+            :capability="reminderCapability"
+            :native-android="nativeAndroid"
+            :web-permission="webPermission"
+            :busy="reminderBusy"
+            :notice="reminderNotice"
+            :manual-copy-text="manualCopyText"
+            :show-apply="false"
+            @update:water-enabled="waterEnabled = $event"
+            @update:harvest-enabled="harvestEnabled = $event"
+            @request-exact="emit('request-exact')"
+            @copy="emit('copy', $event)"
+          />
+
           <div class="farm-result-actions">
-            <button class="button primary" type="button" @click="save">保存结果</button>
+            <button class="button primary" type="button" :disabled="reminderBusy" @click="saveReminders">
+              保存并设置提醒
+            </button>
+            <button class="button secondary" type="button" :disabled="reminderBusy" @click="saveTime">
+              仅保存时间
+            </button>
             <button class="button secondary" type="button" @click="reset({ focus: true })">重新输入</button>
             <button class="button secondary" type="button" @click="emit('close')">取消</button>
           </div>
