@@ -116,6 +116,16 @@ Android 原生范围保持不变：不修改 Manifest、权限、插件、频道
 响应式必须复核 360、390、430、1366px 和 360×500：切换按钮/摘要换行、长 ID、路径、
 44px 触控、无横向滚动、确认框可操作、计算器软键盘布局和原顺序模式。
 
+## 发布状态
+
+- Phase4 已随 v1.0.14 Android Beta Pre-release 发布；
+- Release Tag：`20260727-153511-future-1784566876-AndroidApp-v1.0.14`；
+- Release Commit：`064485a004545955f9227114995ac7056f8d21d2`；
+- Release 已发布且不可变，`draft=false`、`prerelease=true`、`immutable=true`；
+- Schema 仍为 3，本阶段没有新增持久化业务字段；
+- Phase5 尚未启动；
+- 真实 Android 通知清理和物理返回键仍未实测。
+
 ## 已知风险与下一阶段
 
 第三阶段真实 Android 权限、前后台/锁屏/Doze、强制结束、声音振动、通知点击、设备

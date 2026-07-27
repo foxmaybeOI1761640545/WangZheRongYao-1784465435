@@ -26,28 +26,35 @@
 3. 点一下设置提醒；
 4. 到时间后进入游戏处理对应账号。
 
-第一、第二、第三阶段均已发布；当前进入第四阶段，在稳定的 `farmSchedule`、
-`farmReminders` 与 Schema 3 基础上实现行动优先队列和同作物新一轮种植，不提前实现
-第五阶段战令提醒。
+第一、第二、第三、第四阶段均已完成并发布。当前尚未启动第五阶段；下一步计划是在
+Schema 3 和既有农场行动工作流保持稳定的前提下，设计战令 40 级目标的轻量提示，并
+补齐 v1.0.13 → v1.0.14 覆盖安装、通知清理和物理返回键等真实 Android 设备验证。
 
 ## 3. 唯一开发基线
 
 - 仓库：`foxmaybeOI1761640545/WangZheRongYao-1784465435`
-- Release Tag：`20260726-173048-future-1784566876-AndroidApp-v1.0.13`
-- 基线提交：`e43f44cfd2f26f72ce2aa589caaadb1b4397af85`
-- Release：v1.0.13 Android Beta Pre-release，已发布且不可变；
-- 第三阶段的六个提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
-- 第四阶段基线分支直接从上述不可变 Tag 创建，不修改 Tag、`main` 或 Android 发布分支。
+- Release Tag：`20260727-153511-future-1784566876-AndroidApp-v1.0.14`
+- 基线提交：`064485a004545955f9227114995ac7056f8d21d2`
+- Release：v1.0.14 Android Beta Pre-release，`draft=false`、`prerelease=true`、
+  `immutable=true`；
+- 第四阶段的八个提交已通过单次、非强制、纯 fast-forward 进入
+  `future/1784566876/AndroidApp`，没有使用 GitHub Merge 按钮，也没有产生 Merge
+  Commit；
+- PR #11 因 Head 成为 Base 历史而由 GitHub 自动标记 merged/closed；
+  `merge_commit_sha` 等于第四阶段 Head，不表示生成了 Merge Commit；
+- 当前文档修正分支直接从上述不可变 Tag 创建，不修改 Tag、`main`、Android 发布分支
+  或第四阶段功能分支。
 
 ## 4. 当前开发分支
 
-- 分支：`future/1785064821/FarmWorkflowPhase4`
-- 阶段：第四阶段——行动优先队列与新一轮种植
+- 分支：`future/1785146294/Phase4ReleaseDocs`
+- 阶段：第四阶段发布后文档状态修正；第五阶段尚未启动
 - 第一阶段状态：已通过 PR #8 进入 `future/1784566876/AndroidApp`，并发布 v1.0.11；
 - 第二阶段状态：PR #9 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
 - 第三阶段状态：PR #10 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
-- 发布状态：v1.0.13 Beta Pre-release 已成功发布且不可变；第四阶段仅创建 Draft PR，
-  不发布 v1.0.14。
+- 第四阶段状态：PR #11 的八个提交已纯 fast-forward 到 AndroidApp，没有 Merge
+  Commit，并已发布 v1.0.14；
+- 发布状态：v1.0.14 Beta Pre-release 已成功发布且不可变；当前任务不创建 v1.0.15。
 
 ## 5. 当前技术栈
 
@@ -196,7 +203,7 @@ CROP_TYPES = ['', '8', '16', '32']
 - [x] 通过 PR #8 合并到 `future/1784566876/AndroidApp`。
 - [x] 发布不可变的 v1.0.11 Android Beta Pre-release。
 
-## 11. 尚未完成
+## 11. 当前阶段清单
 
 ### 第二阶段
 
@@ -227,17 +234,38 @@ CROP_TYPES = ['', '8', '16', '32']
 
 ### 第四阶段
 
-- [ ] 按收获、浇水、成熟、生长、未计时、未记录稳定排序；
-- [ ] 递归行动队列、状态摘要、颜色和无障碍文字；
-- [ ] 保留原顺序模式与独立 UI 偏好；
-- [ ] “已收获并重新种植”原子重置、通知清理和新计算衔接；
-- [ ] 自动化、响应式和方案 B Android Debug 验证；
-- [ ] Draft PR，保持未合并且不发布 v1.0.14。
+- [x] 按收获、浇水、成熟、生长、未计时、未记录稳定排序；
+- [x] 递归行动队列、状态摘要、颜色和无障碍文字；
+- [x] 保留原顺序模式与独立 UI 偏好；
+- [x] “已收获并重新种植”原子重置、通知清理和新计算衔接；
+- [x] 自动化 80/80、响应式和方案 B Android Debug 验证；
+- [x] 创建 Draft PR #11；
+- [x] 八个实现提交纯 fast-forward 到 AndroidApp，未产生 Merge Commit；
+- [x] 发布不可变的 v1.0.14 Android Beta Pre-release。
 
 ### 第五阶段
 
-- [ ] 战令 40 级目标提醒；
-- [ ] 只在接近或达到目标时展示轻量提示。
+- [ ] 战令 40 级目标提示；
+- [ ] 仅在接近目标或达到目标时显示；
+- [ ] 避免战令资料占据主页主要空间；
+- [ ] Phase5 详细方案尚未开始实施。
+
+### Android 真实设备验证
+
+- [ ] v1.0.13 → v1.0.14 覆盖安装；
+- [ ] 真实账号数据保留；
+- [ ] Android 物理返回键；
+- [ ] 通知权限；
+- [ ] 精确提醒设置；
+- [ ] 前台、后台、锁屏和 Doze；
+- [ ] 通知点击；
+- [ ] pending 通知真实取消；
+- [ ] delivered 通知真实移除；
+- [ ] 设备重启恢复；
+- [ ] 厂商省电限制；
+- [ ] Android 15 Private Space。
+
+自动化测试、Fake Adapter、Manifest 检查和无头 Chromium 不能替代真机验证。
 
 ## 12. 第一阶段验收结果
 
@@ -469,15 +497,15 @@ Debug 构建在 `android` 目录执行 `gradle assembleDebug`；正式签名构�
 ## 24. 下一位 AI 的具体开始步骤
 
 1. 完整阅读本文件；
-2. 检查不可变 v1.0.13 Tag、当前第四阶段分支和远程 Draft PR，不要从 `main` 猜测状态；
+2. 检查不可变 v1.0.14 Tag、当前文档修正分支及其远程 Draft PR，不要从 `main` 猜测状态；
 3. 执行 `git status -sb`，确认没有无关改动；
-4. 执行 `npm ci`、`npm test`、`npm run build`、`npm run build:android` 和 `npm run sync:android`；
-5. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
-6. 第四阶段变更必须保持行动状态完全派生，且新一轮重置与系统通知一致；
-7. 保持 PR 为 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.14；
-8. 不修改 v1.0.13 Tag、`main` 或 `future/1784566876/AndroidApp`；
-9. 不提前实现自动游戏操作、Schema 4 或第五阶段战令提醒；
-10. 修改完成后更新本文件的测试、风险、PR 和提交记录。
+4. 确认第一至第四阶段已完成发布、Schema 仍为 3，且第五阶段尚未启动；
+5. 若开始第五阶段，先设计战令 40 级轻量提示的显示阈值和主页信息边界；
+6. 同步安排 v1.0.13 → v1.0.14 覆盖安装、物理返回键和真实通知清理的设备验证；
+7. 确认方案 B 工作流继续使用 Gradle 8.11.1、JDK 21 和系统 `gradle` 命令，不得新增 Wrapper；
+8. 当前文档修正 PR 保持 Draft，不合并、不触发 Android Signed Release、不创建 v1.0.15；
+9. 不修改 v1.0.14 Tag、`main`、`future/1784566876/AndroidApp` 或第四阶段功能分支；
+10. 后续修改完成后继续更新本文件的测试、风险、PR 和提交记录。
 
 ## 25. 更新日志
 
@@ -803,10 +831,37 @@ Release API 复核结果：v1.0.13 为 `draft=false`、`prerelease=true`、
 | `89afa5d` | Store 原子重置、pending/delivered 清理、确认框和计算器衔接 |
 | `b83a78d` | 备份稳定字段白名单，排除行动运行时状态 |
 | `03d19ca` | 状态、排序、递归、新一轮、通知清理和 UI 契约测试 |
+| `020a688` | 第四阶段路线、行动规则和数据边界文档 |
+| `064485a` | 第四阶段最终自动化、响应式和 Android Debug 验证记录 |
 
 Android 13/14 权限流程、前后台/锁屏/Doze/强制结束通知、声音振动、通知点击、重启恢复、
 覆盖安装和 Android 15 Private Space 仍必须真机验证。静态测试、无头 Chromium 和
-Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第四阶段
-[Draft PR #11](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/11)
-保持 Draft、不合并；Phase4 HEAD 只触发验证工作流，未触发 Signed Release，也未创建
-v1.0.14。第五阶段战令 40 级提醒尚未实现。
+Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第五阶段战令 40 级
+轻量提示尚未启动。
+
+## 41. 第四阶段发布结果
+
+- 开发分支：`future/1785064821/FarmWorkflowPhase4`
+- Phase4 Head：`064485a004545955f9227114995ac7056f8d21d2`
+- Draft PR：[PR #11](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/11)
+- 发布前相对 AndroidApp：ahead 8、behind 0；
+- 集成方式：AndroidApp 从 `e43f44cfd2f26f72ce2aa589caaadb1b4397af85` 单次、
+  非强制、纯 fast-forward 到 Phase4 Head；
+- GitHub 状态：未使用 Merge 按钮，未产生 Merge Commit；PR #11 因 Head 成为 Base
+  历史而自动标记 merged/closed，Phase4 分支继续保留；
+- Release Tag：`20260727-153511-future-1784566876-AndroidApp-v1.0.14`
+- Signed Release Run：
+  [30246628093](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/actions/runs/30246628093)，
+  `success`；
+- Release：`prerelease=true`、`draft=false`、`immutable=true`；
+- 资产：APK、AAB、`update.json`、`SHA256SUMS.txt`，共 4 项；
+- 账号备份 Schema：仍为 3；
+- 自动化测试：80/80；
+- Android Debug：方案 B 构建成功；
+- `main`：未修改，仍为 `58272446ea40c80fbcb3ca1bca7dcc845750a75b`；
+- v1.0.15：未创建；
+- Phase5 尚未启动。
+
+发布和静态验证成功，但 v1.0.13 → v1.0.14 覆盖安装、真实数据保留、Android 物理
+返回键、pending/delivered 通知清理及权限、锁屏、Doze、通知点击和重启恢复仍未在
+真实设备验证。
