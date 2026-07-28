@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import BackupCenter from './components/BackupCenter.vue'
+import CloudSyncStatus from './components/CloudSyncStatus.vue'
 import FarmCycleResetDialog from './components/FarmCycleResetDialog.vue'
 import FarmTimeCalculator from './components/FarmTimeCalculator.vue'
 import GroupBrowser from './components/GroupBrowser.vue'
@@ -33,7 +34,17 @@ import {
   registerNativeBackHandler,
 } from './platform/nativeAppShell.js'
 import { createFarmReminderCoordinator } from './services/farmReminderCoordinator.js'
+import { createCloudSyncService } from './services/cloudSyncService.js'
 import { createWebFarmReminderMonitor } from './services/webFarmReminderMonitor.js'
+import {
+  SYNC_DOCUMENT_SCHEMA_VERSION,
+  SYNC_HISTORY_TABLE,
+  SYNC_SAVE_RPC,
+  SYNC_STATE_TABLE,
+  SYNC_WORKSPACE_ID,
+  validateSupabaseConfig,
+} from './config/supabaseConfig.js'
+import { getSupabaseClient } from './lib/supabaseClient.js'
 
 const store = useAccountStore()
 const route = reactive({ type: 'group', id: 'root' })
@@ -67,12 +78,24 @@ const reminderCapability = reactive({
   displayPermission: nativeAndroid ? 'unknown' : 'unsupported',
   exactPermission: nativeAndroid ? 'unknown' : 'unsupported',
 })
+const cloudSyncStatus = reactive({
+  state: 'idle',
+  message: '准备同步',
+  revision: 0,
+  lastSyncedAt: '',
+  deviceIdShort: '',
+  error: '',
+  online: true,
+  paused: false,
+  merged: false,
+})
 let browserScrollPosition = 0
 let removeQuickBackHandler = null
 let removeReminderActionListener = null
 let removeAppStateListener = null
 let notificationRequestAttempted = false
 let farmCycleResetTrigger = null
+let unsubscribeCloudSyncStatus = null
 
 const groupForm = reactive({ name: '' })
 const settingsForm = reactive({ name: '' })
@@ -147,6 +170,26 @@ const webReminderMonitor = createWebFarmReminderMonitor({
     plan,
     () => handleReminderNavigation(plan.serverId),
   ),
+})
+
+const supabaseValidation = validateSupabaseConfig()
+const cloudSyncService = createCloudSyncService({
+  store,
+  supabase: getSupabaseClient(),
+  config: {
+    valid: supabaseValidation.valid,
+    errors: supabaseValidation.errors,
+    workspaceId: SYNC_WORKSPACE_ID,
+    documentSchemaVersion: SYNC_DOCUMENT_SCHEMA_VERSION,
+    stateTable: SYNC_STATE_TABLE,
+    historyTable: SYNC_HISTORY_TABLE,
+    saveRpc: SYNC_SAVE_RPC,
+  },
+  onRemoteApplied: async () => {
+    syncRoute()
+    webReminderMonitor.prime(nowMs.value)
+    await syncFarmReminders()
+  },
 })
 
 function applyReminderResult(result, { resumed = false } = {}) {
@@ -246,15 +289,23 @@ onMounted(async () => {
     reminderNotice.value = '通知点击监听初始化失败；已保存的提醒计划不受影响。'
   }
   try {
-    removeAppStateListener = await reminderAdapter.addAppStateListener(({ isActive }) => {
-      if (!isActive) return
+    removeAppStateListener = await reminderAdapter.addAppStateListener(async ({ isActive }) => {
+      if (!isActive) {
+        void cloudSyncService.flushPending({ bestEffort: true })
+        return
+      }
       refreshFarmClock()
-      void syncFarmReminders({ resumed: true })
+      await cloudSyncService.pullAndMerge()
+      await syncFarmReminders({ resumed: true })
     })
   } catch {
     reminderNotice.value = '前台恢复监听初始化失败，请重新打开应用以校准提醒。'
   }
   await syncFarmReminders({ initialise: true })
+  unsubscribeCloudSyncStatus = cloudSyncService.subscribeStatus((nextStatus) => {
+    Object.assign(cloudSyncStatus, nextStatus)
+  })
+  void cloudSyncService.initialise()
 })
 
 onBeforeUnmount(() => {
@@ -263,6 +314,8 @@ onBeforeUnmount(() => {
   removeQuickBackHandler?.()
   removeReminderActionListener?.()
   removeAppStateListener?.()
+  unsubscribeCloudSyncStatus?.()
+  void cloudSyncService.destroy()
 })
 
 watch(nowMs, () => {
@@ -665,6 +718,14 @@ function deleteCurrentGroup() {
   deleteGroupById(id)
   showSettingsDialog.value = false
 }
+
+async function importBackupRoot(root) {
+  cloudSyncService.saveRecovery('before-json-import')
+  store.replaceRoot(root, { source: 'local-import' })
+  navigateGroup('root')
+  webReminderMonitor.prime(nowMs.value)
+  await syncFarmReminders()
+}
 </script>
 
 <template>
@@ -679,6 +740,12 @@ function deleteCurrentGroup() {
       </button>
 
       <div class="app-header-tools">
+        <CloudSyncStatus
+          class="cloud-sync-header"
+          :status="cloudSyncStatus"
+          @sync="cloudSyncService.syncNow()"
+          @open="showBackupDialog = true"
+        />
         <button class="button secondary backup-launch" type="button" @click="showBackupDialog = true">
           数据与备份
         </button>
@@ -743,7 +810,10 @@ function deleteCurrentGroup() {
   <BackupCenter
     v-if="showBackupDialog"
     :stats="store.stats.value"
+    :cloud-sync="cloudSyncService"
+    :cloud-status="cloudSyncStatus"
     @close="showBackupDialog = false"
+    @import-root="importBackupRoot"
   />
 
   <FarmTimeCalculator
@@ -949,14 +1019,21 @@ function deleteCurrentGroup() {
 <style scoped>
 .app-header-tools {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: minmax(150px, 190px) minmax(108px, 126px) auto;
   align-items: center;
   justify-content: end;
   gap: 12px;
   min-width: 0;
 }
 
+.cloud-sync-header {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 .backup-launch {
+  grid-column: 2;
+  grid-row: 1;
   width: auto;
   min-width: 122px;
   white-space: nowrap;
@@ -968,14 +1045,56 @@ function deleteCurrentGroup() {
   background: #fff2f4;
 }
 
+.app-header-tools .global-stats {
+  grid-column: 3;
+}
+
+html.capacitor-native .app-header-tools {
+  grid-template-columns: minmax(150px, 190px) minmax(108px, 126px) 74px auto;
+}
+
+html.capacitor-native .app-header-tools .update-launch {
+  grid-column: 3;
+}
+
+html.capacitor-native .app-header-tools .global-stats {
+  grid-column: 4;
+}
+
 @media (max-width: 720px) {
   .app-header-tools {
+    grid-template-columns: minmax(104px, 1fr) 86px;
+    grid-template-rows: auto 44px;
     gap: 8px;
   }
 
+  .cloud-sync-header {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .backup-launch {
+    grid-column: 1;
+    grid-row: 1;
     min-width: 108px;
     padding-inline: 10px;
+  }
+
+  .app-header-tools .global-stats {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  html.capacitor-native .app-header-tools {
+    grid-template-columns: minmax(102px, 1fr) 76px 88px;
+  }
+
+  html.capacitor-native .app-header-tools .update-launch {
+    grid-column: 2;
+  }
+
+  html.capacitor-native .app-header-tools .global-stats {
+    grid-column: 3;
   }
 }
 </style>

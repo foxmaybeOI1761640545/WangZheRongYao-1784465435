@@ -19,9 +19,11 @@ const DEFAULT_CONFIG = Object.freeze({
 
 const props = defineProps({
   stats: { type: Object, required: true },
+  cloudSync: { type: Object, required: true },
+  cloudStatus: { type: Object, required: true },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'import-root'])
 
 function cleanText(value, fallback = '') {
   return String(value ?? '').trim() || fallback
@@ -70,6 +72,11 @@ const config = reactive(loadConfig())
 const pat = ref(rememberPat.value ? safeStorageGet(PAT_STORAGE_KEY) : '')
 const busy = ref(false)
 const testingPat = ref(false)
+const cloudBusy = ref(false)
+const historyBusy = ref(false)
+const cloudHistory = ref([])
+const selectedHistoryRevision = ref('')
+const selectedRecoveryIndex = ref('')
 const importInput = ref(null)
 const notice = reactive({ type: '', text: '', url: '' })
 
@@ -316,15 +323,113 @@ async function importFile(event) {
     if (!confirmed) return
 
     const root = extractSnapshotRoot(payload)
-    safeStorageSet(DATA_STORAGE_KEY, JSON.stringify(root))
-    setNotice('success', '备份数据已写入本地，页面即将刷新。')
-    window.setTimeout(() => {
-      window.location.hash = '#/group/root'
-      window.location.reload()
-    }, 450)
+    emit('import-root', root)
+    setNotice('success', '备份数据已写入本地，并已加入云同步队列。')
   } catch (error) {
     setNotice('error', error.message || '无法读取该备份文件。')
   }
+}
+
+async function runCloudAction(action, successText) {
+  resetNotice()
+  cloudBusy.value = true
+  try {
+    await action()
+    setNotice('success', successText)
+  } catch (error) {
+    setNotice('error', error.message || '云同步操作失败。')
+  } finally {
+    cloudBusy.value = false
+  }
+}
+
+function syncNow() {
+  return runCloudAction(
+    () => props.cloudSync.syncNow(),
+    '已完成一次云同步检查。',
+  )
+}
+
+function reloadFromCloud() {
+  if (!window.confirm('将使用当前云端版本替换本机账号树。操作前会自动保存本地恢复点，确定继续吗？')) return
+  return runCloudAction(
+    () => props.cloudSync.reloadFromCloud(),
+    '已从云端重新加载，并保留操作前的本地恢复点。',
+  )
+}
+
+async function loadCloudHistory() {
+  resetNotice()
+  historyBusy.value = true
+  try {
+    cloudHistory.value = await props.cloudSync.listHistory()
+    if (!selectedHistoryRevision.value && cloudHistory.value.length) {
+      selectedHistoryRevision.value = String(cloudHistory.value[0].revision)
+    }
+    setNotice('success', `已读取 ${cloudHistory.value.length} 个云端历史版本。`)
+  } catch (error) {
+    setNotice('error', error.message || '读取云端历史失败。')
+  } finally {
+    historyBusy.value = false
+  }
+}
+
+function restoreCloudHistory() {
+  const revision = Number(selectedHistoryRevision.value)
+  if (!Number.isFinite(revision)) {
+    setNotice('error', '请先选择一个云端历史版本。')
+    return
+  }
+  if (!window.confirm(`将把 revision ${revision} 作为新的云端版本恢复。操作前会保存本地恢复点，确定继续吗？`)) return
+  return runCloudAction(
+    () => props.cloudSync.restoreHistory(revision),
+    `已将历史 revision ${revision} 恢复为新的云端版本。`,
+  )
+}
+
+function toggleCloudPaused() {
+  const paused = props.cloudSync.setPaused(!props.cloudStatus.paused)
+  setNotice('success', paused ? '本设备自动同步已暂停。' : '本设备自动同步已恢复。')
+}
+
+function clearCloudError() {
+  props.cloudSync.clearError()
+  setNotice('success', '已清除本机同步错误显示。')
+}
+
+const recoveries = computed(() => props.cloudSync.getRecoveries())
+
+function exportSelectedRecovery() {
+  const recovery = recoveries.value[Number(selectedRecoveryIndex.value)]
+  if (!recovery) {
+    setNotice('error', '请先选择一个本地恢复点。')
+    return
+  }
+  const blob = new Blob([JSON.stringify(recovery, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `wangzhe-cloud-recovery-${timestampName()}.json`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+  setNotice('success', '已导出本地同步恢复点。')
+}
+
+function restoreSelectedRecovery() {
+  const index = Number(selectedRecoveryIndex.value)
+  if (!recoveries.value[index]) {
+    setNotice('error', '请先选择一个本地恢复点。')
+    return
+  }
+  if (!window.confirm('将使用选中的本地恢复点替换当前账号树，并作为本地修改同步。确定继续吗？')) return
+  return runCloudAction(
+    () => props.cloudSync.restoreRecovery(index),
+    '已恢复本地同步恢复点，并加入同步队列。',
+  )
 }
 
 async function backupToGitHub() {
@@ -393,9 +498,76 @@ async function backupToGitHub() {
         </div>
       </section>
 
+      <section class="backup-section cloud-section">
+        <div class="backup-section-heading">
+          <div>
+            <h3>Supabase 自动同步</h3>
+            <p>本地优先；断网时仍可编辑，联网后自动合并并同步。</p>
+          </div>
+        </div>
+
+        <div class="cloud-summary-grid">
+          <span><small>状态</small><strong>{{ cloudStatus.message }}</strong></span>
+          <span><small>云端 revision</small><strong>{{ cloudStatus.revision || 0 }}</strong></span>
+          <span><small>最后同步</small><strong>{{ cloudStatus.lastSyncedAt || '尚未完成' }}</strong></span>
+        </div>
+        <p v-if="cloudStatus.error" class="cloud-error">{{ cloudStatus.error }}</p>
+
+        <div class="backup-action-row">
+          <button class="button primary" type="button" :disabled="cloudBusy" @click="syncNow">
+            {{ cloudBusy ? '处理中…' : '立即同步' }}
+          </button>
+          <button class="button secondary" type="button" :disabled="cloudBusy" @click="reloadFromCloud">
+            从云端重新加载
+          </button>
+          <button class="button secondary" type="button" :disabled="historyBusy" @click="loadCloudHistory">
+            {{ historyBusy ? '读取中…' : '查看最近 50 个版本' }}
+          </button>
+        </div>
+
+        <div v-if="cloudHistory.length" class="cloud-restore-row">
+          <label class="field">
+            <span>云端历史版本</span>
+            <select v-model="selectedHistoryRevision">
+              <option v-for="entry in cloudHistory" :key="entry.revision" :value="String(entry.revision)">
+                revision {{ entry.revision }} · {{ entry.saved_at || '未知时间' }}
+              </option>
+            </select>
+          </label>
+          <button class="button secondary" type="button" :disabled="cloudBusy" @click="restoreCloudHistory">
+            恢复为新版本
+          </button>
+        </div>
+
+        <details class="cloud-advanced">
+          <summary>高级同步选项</summary>
+          <div class="backup-action-row">
+            <button class="button secondary" type="button" @click="toggleCloudPaused">
+              {{ cloudStatus.paused ? '恢复本设备自动同步' : '暂停本设备自动同步' }}
+            </button>
+            <button class="button secondary" type="button" @click="clearCloudError">
+              清除本机同步错误状态
+            </button>
+          </div>
+          <div v-if="recoveries.length" class="cloud-restore-row">
+            <label class="field">
+              <span>本地恢复点（最多 3 份）</span>
+              <select v-model="selectedRecoveryIndex">
+                <option value="">请选择</option>
+                <option v-for="(entry, index) in recoveries" :key="`${entry.createdAt}-${index}`" :value="String(index)">
+                  {{ entry.createdAt }} · {{ entry.reason }}
+                </option>
+              </select>
+            </label>
+            <button class="button secondary" type="button" @click="exportSelectedRecovery">导出恢复点</button>
+            <button class="button secondary" type="button" @click="restoreSelectedRecovery">恢复本地版本</button>
+          </div>
+        </details>
+      </section>
+
       <section class="backup-section github-section">
         <div class="backup-section-heading split">
-          <div><h3>备份到 GitHub</h3><p>仓库配置和 PAT 都可以保存在当前浏览器，便于下次直接备份。</p></div>
+          <div><h3>手动 GitHub 历史备份</h3><p>仓库配置和 PAT 都可以保存在当前浏览器，便于下次直接备份。</p></div>
           <button class="text-button" type="button" @click="resetDefaults">恢复默认配置</button>
         </div>
 
@@ -474,6 +646,18 @@ async function backupToGitHub() {
 .backup-summary small { color: #69758a; }
 .backup-section { margin: 20px 30px 0; padding: 22px; border: 1px solid #dbe4f2; border-radius: 20px; background: #fff; }
 .github-section { background: #f8faff; }
+.cloud-section { background: #f5f9ff; }
+.cloud-summary-grid { display: grid; grid-template-columns: .8fr .7fr 1.5fr; gap: 10px; margin-bottom: 16px; }
+.cloud-summary-grid span { display: grid; gap: 4px; min-width: 0; padding: 12px; border: 1px solid #dbe5f4; border-radius: 13px; background: #fff; }
+.cloud-summary-grid small { color: #718099; }
+.cloud-summary-grid strong { overflow-wrap: anywhere; color: #263f69; font-size: 13px; }
+.cloud-error { padding: 11px 13px; border-radius: 10px; color: #8a2525; background: #fff0f0; overflow-wrap: anywhere; }
+.cloud-restore-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 10px; margin-top: 16px; }
+.cloud-restore-row .field { margin: 0; }
+.cloud-restore-row .button { width: auto; min-height: 44px; }
+.cloud-advanced { margin-top: 16px; padding: 12px; border: 1px solid #dbe5f4; border-radius: 13px; background: #fff; }
+.cloud-advanced summary { color: #31588f; cursor: pointer; font-weight: 800; }
+.cloud-advanced[open] summary { margin-bottom: 12px; }
 .backup-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .backup-section-heading h3 { margin: 0 0 5px; color: #1d3157; }
 .backup-section-heading p { margin: 0; color: #6b768a; line-height: 1.55; }
@@ -506,6 +690,8 @@ async function backupToGitHub() {
   .backup-section { margin: 16px 18px 0; padding: 17px; }
   .backup-section-heading.split { flex-direction: column; }
   .backup-config-grid { grid-template-columns: 1fr; }
+  .cloud-summary-grid { grid-template-columns: 1fr; }
+  .cloud-restore-row { grid-template-columns: 1fr; }
   .backup-config-grid .full { grid-column: auto; }
   .backup-action-row .button { width: 100%; }
   .target-preview { grid-template-columns: 1fr; }

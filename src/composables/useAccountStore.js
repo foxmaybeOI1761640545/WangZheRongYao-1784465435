@@ -1,4 +1,4 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, toRaw, watch } from 'vue'
 import {
   CROP_TYPES,
   nextCropType,
@@ -137,6 +137,9 @@ function loadTree() {
 
 export function useAccountStore() {
   const state = reactive({ root: loadTree() })
+  const mutationSubscribers = new Set()
+  let mutationEventsSuppressed = 0
+  let mutationSource = 'local'
 
   watch(
     () => state.root,
@@ -146,9 +149,63 @@ export function useAccountStore() {
       } catch {
         // Storage failures do not block the current session.
       }
+      if (mutationEventsSuppressed === 0) {
+        const event = {
+          source: mutationSource,
+          root: exportRoot(),
+        }
+        mutationSubscribers.forEach((subscriber) => subscriber(event))
+      }
     },
     { deep: true, flush: 'sync' },
   )
+
+  function exportRoot() {
+    const root = toRaw(state.root)
+    if (typeof structuredClone === 'function') return structuredClone(root)
+    return JSON.parse(JSON.stringify(root))
+  }
+
+  function withMutationEventsSuppressed(callback) {
+    mutationEventsSuppressed += 1
+    try {
+      return callback()
+    } finally {
+      mutationEventsSuppressed -= 1
+    }
+  }
+
+  function replaceRoot(rawRoot, { source = 'local-import' } = {}) {
+    const hydrated = repairFarmReminderIdsInTree(
+      hydrateNode(rawRoot) ?? createRoot(),
+    )
+    const previousSource = mutationSource
+    mutationSource = source
+    try {
+      if (source === 'cloud' || source === 'cloud-history') {
+        withMutationEventsSuppressed(() => {
+          state.root = hydrated
+        })
+      } else {
+        state.root = hydrated
+      }
+    } finally {
+      mutationSource = previousSource
+    }
+    return exportRoot()
+  }
+
+  function subscribeToMutations(subscriber) {
+    if (typeof subscriber !== 'function') return () => {}
+    mutationSubscribers.add(subscriber)
+    return () => mutationSubscribers.delete(subscriber)
+  }
+
+  function unsubscribeFromMutations(subscriber) {
+    if (subscriber) return mutationSubscribers.delete(subscriber)
+    mutationSubscribers.clear()
+    return true
+  }
 
   function findNode(id, node = state.root) {
     if (node.id === id) return node
@@ -623,6 +680,11 @@ export function useAccountStore() {
   return {
     root: computed(() => state.root),
     stats,
+    exportRoot,
+    replaceRoot,
+    subscribeToMutations,
+    unsubscribeFromMutations,
+    withMutationEventsSuppressed,
     findNode,
     getGroup,
     getServer,
