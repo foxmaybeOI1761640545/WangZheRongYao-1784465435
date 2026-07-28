@@ -1,6 +1,19 @@
-# 数据导出与 GitHub 备份
+# 数据导出、云同步与 GitHub 备份
 
-## 1. 备份格式
+## Supabase 自动同步
+
+v1.0.15 默认使用固定 Workspace 自动同步。它与本页的手动 JSON/GitHub 备份相互独立：
+
+- 本地账号树仍先写入 `wangzhe-account-manager:v1`；
+- 离线修改会持久化并在联网后补同步；
+- BackupCenter 可查看状态、立即同步、重新加载云端和恢复最近 50 个云端历史版本；
+- 危险操作先明确确认并保存最近 3 份本地 recovery；
+- GitHub PAT、备份仓库配置、通知权限和系统 pending/delivered 状态不进入云端。
+
+同步文档 Schema 1 不改变手动 JSON Schema 3。完整设计见
+[`CLOUD_SYNC.md`](CLOUD_SYNC.md)。
+
+## 1. 手动备份格式
 
 导出与 GitHub 备份使用相同的 JSON 快照格式：
 

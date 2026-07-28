@@ -26,28 +26,28 @@
 3. 点一下设置提醒；
 4. 到时间后进入游戏处理对应账号。
 
-第一、第二、第三阶段均已发布；当前进入第四阶段，在稳定的 `farmSchedule`、
-`farmReminders` 与 Schema 3 基础上实现行动优先队列和同作物新一轮种植，不提前实现
-第五阶段战令提醒。
+第一、第二、第三、第四阶段均已发布。当前在稳定的 `farmSchedule`、
+`farmReminders` 与 Schema 3 基础上增加 Supabase 本地优先多设备同步；行动优先队列、
+同作物新一轮种植和现有提醒继续保留，不提前实现第五阶段战令提醒。
 
 ## 3. 唯一开发基线
 
 - 仓库：`foxmaybeOI1761640545/WangZheRongYao-1784465435`
-- Release Tag：`20260726-173048-future-1784566876-AndroidApp-v1.0.13`
-- 基线提交：`e43f44cfd2f26f72ce2aa589caaadb1b4397af85`
-- Release：v1.0.13 Android Beta Pre-release，已发布且不可变；
-- 第三阶段的六个提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
-- 第四阶段基线分支直接从上述不可变 Tag 创建，不修改 Tag、`main` 或 Android 发布分支。
+- Release Tag：`20260727-153511-future-1784566876-AndroidApp-v1.0.14`
+- 基线提交：`064485a004545955f9227114995ac7056f8d21d2`
+- Release：v1.0.14 Android Beta Pre-release，已发布且不可变；
+- 第四阶段的提交已通过纯 fast-forward 进入 `future/1784566876/AndroidApp`，没有产生 Merge Commit；
+- Supabase 同步分支直接从上述不可变 Tag 创建，不修改 Tag、`main` 或已发布 Release。
 
 ## 4. 当前开发分支
 
-- 分支：`future/1785064821/FarmWorkflowPhase4`
-- 阶段：第四阶段——行动优先队列与新一轮种植
+- 分支：`future/1785261957/SupabaseCloudSync`
+- 阶段：Supabase Cloud Sync——本地优先多设备自动同步
 - 第一阶段状态：已通过 PR #8 进入 `future/1784566876/AndroidApp`，并发布 v1.0.11；
 - 第二阶段状态：PR #9 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
 - 第三阶段状态：PR #10 的六个提交已纯 fast-forward 到 AndroidApp，没有 Merge Commit；
-- 发布状态：v1.0.13 Beta Pre-release 已成功发布且不可变；第四阶段仅创建 Draft PR，
-  不发布 v1.0.14。
+- 第四阶段状态：已进入 AndroidApp 并发布不可变 v1.0.14 Beta Pre-release；
+- 当前发布目标：检查全部门禁后发布 v1.0.15 Beta Pre-release。
 
 ## 5. 当前技术栈
 
@@ -227,12 +227,24 @@ CROP_TYPES = ['', '8', '16', '32']
 
 ### 第四阶段
 
-- [ ] 按收获、浇水、成熟、生长、未计时、未记录稳定排序；
-- [ ] 递归行动队列、状态摘要、颜色和无障碍文字；
-- [ ] 保留原顺序模式与独立 UI 偏好；
-- [ ] “已收获并重新种植”原子重置、通知清理和新计算衔接；
-- [ ] 自动化、响应式和方案 B Android Debug 验证；
-- [ ] Draft PR，保持未合并且不发布 v1.0.14。
+- [x] 按收获、浇水、成熟、生长、未计时、未记录稳定排序；
+- [x] 递归行动队列、状态摘要、颜色和无障碍文字；
+- [x] 保留原顺序模式与独立 UI 偏好；
+- [x] “已收获并重新种植”原子重置、通知清理和新计算衔接；
+- [x] 自动化、响应式和方案 B Android Debug 验证；
+- [x] 纯 fast-forward 并发布不可变 v1.0.14 Beta Pre-release。
+
+### Supabase Cloud Sync
+
+- [x] 固定公开配置、单例客户端和格式校验；
+- [x] 独立同步文档 Schema 1、节点级合并和删除墓碑；
+- [x] Store mutation 订阅、远程替换抑制和原 Key 即时保存；
+- [x] local-first CloudSyncService、revision、Realtime、debounce/maxWait 和退避；
+- [x] 云端状态、历史恢复、暂停/恢复与最近 3 个 recovery；
+- [x] 可复现 SQL、RLS、受限 RPC、2 MB 和 50 历史限制；
+- [x] Fake Supabase、合并、Store、离线和 UI 契约自动化；
+- [ ] Draft PR 当前 Head 的全部远程检查；
+- [ ] pure fast-forward AndroidApp 和 v1.0.15 Beta Pre-release。
 
 ### 第五阶段
 
@@ -808,5 +820,68 @@ Android 13/14 权限流程、前后台/锁屏/Doze/强制结束通知、声音�
 覆盖安装和 Android 15 Private Space 仍必须真机验证。静态测试、无头 Chromium 和
 Debug APK 只能证明逻辑、布局与可构建性，不能替代真实通知行为。第四阶段
 [Draft PR #11](https://github.com/foxmaybeOI1761640545/WangZheRongYao-1784465435/pull/11)
-保持 Draft、不合并；Phase4 HEAD 只触发验证工作流，未触发 Signed Release，也未创建
-v1.0.14。第五阶段战令 40 级提醒尚未实现。
+的提交后来通过纯 fast-forward 进入 AndroidApp，并发布不可变 v1.0.14。第五阶段战令
+40 级提醒尚未实现。
+
+## 41. Supabase Cloud Sync 实现决策
+
+1. 唯一基线是不可变 Tag
+   `20260727-153511-future-1784566876-AndroidApp-v1.0.14`，提交
+   `064485a004545955f9227114995ac7056f8d21d2`。
+2. 原账号树 Key 和手动备份 Schema 3 不变；同步文档使用独立 Schema 1，降级到
+   v1.0.14 仍可直接读取业务数据。
+3. URL、Publishable Key 和 Workspace UUID 是允许进入 APK 的公开客户端配置；
+   不引入 Auth、Secret Key、service_role、数据库密码或连接字符串。
+4. 节点按 `updatedAt`/`updatedBy` 决胜，同位置按 position/updatedAt/id 排序；
+   group 删除为全部后代建立 tombstone，父节点异常时移到 root。
+5. Device ID、revision、dirty、逻辑时间、工作文档和 recovery 使用独立 sidecar；
+   本地修改先写原 localStorage，再按 1200 ms debounce、5000 ms maxWait 上传。
+6. 所有云端写入只调用 `save_wangzhe_sync_state`，revision 冲突最多立即重试 3 次；
+   失败后保留 dirty 并按 2/5/15/30 秒退避。
+7. Realtime 只订阅固定 Workspace 的 UPDATE；远程数据应用后修复提醒 ID、重新校准
+   系统提醒并 prime 网页提醒。
+8. 云端历史恢复通过同一 RPC 生成新 revision，不直接 update 表；危险操作前保留
+   最近 3 个本地 recovery。
+9. SQL migration 只作为可复现契约提交，本任务不使用 Secret 或数据库管理权限执行
+   生产 migration。
+10. Android 原生代码、Manifest 权限、applicationId、Gradle、固定签名和 Signed
+    Release workflow 保持不变。
+
+## 42. Supabase Cloud Sync 验证与风险
+
+当前自动化覆盖账号树扁平化/重建、嵌套顺序、稳定提醒 ID、运行时字段排除、非法 parent、
+循环修复、确定性合并、墓碑、删除后恢复、Store mutation、远程替换抑制、JSON 导入、
+bootstrap、首次配对、离线 dirty、online 补同步、revision conflict、Realtime、
+debounce/maxWait、清理和 HTTP/项目暂停容错。
+
+| 命令/检查 | 本地结果 |
+| --- | --- |
+| `npm ci` | 通过；按 lockfile 安装 140 个包 |
+| `npm test` | 通过，108/108；原有 80 项全部回归通过 |
+| `npm run build` | 通过 |
+| `npm run build:android` | 通过 |
+| `npm run sync:android` | 通过；生成性格式噪声和临时 XML 已移除，原生目录无差异 |
+| `git diff --check` | 通过 |
+| Supabase 只读冒烟 | state/history 读取、Realtime `SUBSCRIBED`、必定 revision 冲突的 RPC dry-run 均通过；revision 和 history 行数前后不变 |
+| 360/390/430/1366、360×500 | 响应式源码契约测试通过；当前容器无 Chromium 可执行文件，未执行像素级截图复核 |
+| 本地 Android Debug | 未运行：当前环境只有 JDK 17 且未安装 `gradle` |
+| GitHub CI / Android Debug | Draft PR 推送后记录 |
+| v1.0.15 Signed Release | 发布门禁通过后记录 |
+
+实现提交：
+
+| 提交 | 内容 |
+| --- | --- |
+| `d146468` | Supabase 固定公开配置、客户端、确定性同步文档、sidecar 与生产 SQL 契约 |
+| `aa3b6dc` | Store mutation 桥接、CloudSyncService、状态栏、BackupCenter 与提醒校准集成 |
+| `0e2b012` | 合并/墓碑、首次配对、离线/冲突/Realtime、历史恢复和响应式契约测试 |
+
+已知限制：
+
+1. 固定匿名 Workspace 适合受控个人应用，不是多租户鉴权；
+2. 合并粒度为节点，不是字段；同节点并行修改按最后节点版本决胜；
+3. 单设备逻辑时间防止时钟回拨，但严重跨设备时钟偏差仍可能影响先后；
+4. 应用完全关闭时 JavaScript 不持续后台同步；
+5. Supabase 免费项目暂停时本地功能完整，恢复后才补同步；
+6. Android 真机通知、WebSocket 长时间后台、跨设备弱网和覆盖安装仍需设备验证；
+7. 已发布不可变版本出现问题时只能创建新分支并 roll forward。

@@ -93,3 +93,17 @@ pending/delivered 状态和平台错误属于运行时信息，不进入账号�
 “已收获并重新种植”只执行一次 Store 原子更新：保留当前 `cropType` 和账号资料，清除
 上一轮 `farmSchedule` 与 `farmReminders`。旧通知 ID 只作为调用平台取消接口的瞬时
 返回值，不写入新的业务字段。
+
+## Supabase 同步文档与降级
+
+v1.0.15 继续使用原账号树 Key 和手动备份 Schema 3。云同步把稳定业务字段扁平化为
+独立的同步文档 Schema 1，并把节点修改时间、设备 ID、position 和删除墓碑保存在
+sidecar/云文档中，不污染 group/server。
+
+`farmSchedule` 与完整 `farmReminders`（包括两个稳定 `notificationId`）参与同步。
+Android/浏览器权限、pending/delivered、行动视图、路由、弹窗、GitHub PAT 和错误
+重试状态不参与同步。远程账号树应用后重新执行提醒 ID 修复和提醒协调。
+
+降级到 v1.0.14 后原账号树仍可直接读取，旧版本会忽略云同步 sidecar；此时的新本地
+修改不会上传，重新升级后再通过节点合并补同步。降级或恢复前仍建议保留 Schema 3
+JSON。详细规则见 [`CLOUD_SYNC.md`](CLOUD_SYNC.md)。

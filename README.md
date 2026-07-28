@@ -1,6 +1,8 @@
 # 王者多账号管理器
 
-Vue 3 + Vite 多账号分组管理应用，支持递归分组、区服资料维护、本地 JSON 导出、GitHub 独立分支备份以及 Capacitor Android 原生封装。
+Vue 3 + Vite 多账号分组管理应用，支持递归分组、区服资料维护、农场行动队列、
+本地 JSON/GitHub 历史备份、Supabase 本地优先多设备同步以及 Capacitor Android
+原生封装。
 
 ## Web 开发
 
@@ -51,6 +53,7 @@ Android 版本包含：
 
 页面顶部的“数据与备份”入口提供：
 
+- 固定 Workspace 的 Supabase 后台自动同步、Realtime、云端历史与 recovery；
 - 导出完整 JSON 文件；
 - 从 JSON 文件覆盖恢复；
 - 使用 GitHub 用户名、仓库名、分支名、根目录和 PAT 创建时间戳备份文件；
@@ -70,4 +73,10 @@ Android 版本包含：
 
 PAT 保存到 localStorage 时不会加密，只应在个人可信设备使用。PAT 不会进入导出 JSON、账号备份文件或 GitHub 提交信息。
 
-详细说明见 [数据导出与 GitHub 备份](docs/BACKUP.md)。
+Supabase 同步不需要登录或同步码，断网和免费项目暂停时仍优先保存到原 localStorage。
+公开 Publishable Key 不等于 Secret Key；数据库写入只通过带 revision 检查的固定 RPC。
+
+详细说明见：
+
+- [Supabase 本地优先多设备同步](docs/CLOUD_SYNC.md)
+- [数据导出与 GitHub 备份](docs/BACKUP.md)

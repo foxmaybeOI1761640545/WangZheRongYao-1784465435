@@ -16,6 +16,10 @@
 Android 负责原生容器、系统栏、软键盘、本地通知和构建签名。账号树、Hash 路由、
 编辑、提醒意图、导入导出与 GitHub 备份继续由 Vue 层维护，Web 与 Android 共用同一套业务代码。
 
+v1.0.15 的 Supabase 同步同样完全位于共享 Vue 层，只使用现有 INTERNET 权限下的
+HTTPS 和 WebSocket；不增加原生后台 Service、网络权限、Auth Deep Link 或原生数据库。
+应用启动仍立即读取 WebView localStorage，网络故障不会阻止页面或农场提醒功能。
+
 ## 固定标识
 
 ```text
@@ -152,3 +156,6 @@ Capacitor WebView 的 localStorage 会保存在应用私有数据目录：
 5. 生成 SHA-256 校验文件；
 6. 上传 Artifact；
 7. 创建 GitHub prerelease。
+
+Supabase 详细的数据、离线、Realtime、历史恢复和安全边界见
+[`CLOUD_SYNC.md`](CLOUD_SYNC.md)。
