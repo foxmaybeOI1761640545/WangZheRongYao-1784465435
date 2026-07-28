@@ -20,6 +20,7 @@
     "@capacitor/app": "7.1.2",
     "@capacitor/core": "7.6.7",
     "@capacitor/local-notifications": "7.0.7",
+    "@supabase/supabase-js": "2.111.0",
     "vue": "3.5.39"
   },
   "devDependencies": {
